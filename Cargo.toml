@@ -1,0 +1,47 @@
+#
+# Copyright (c) 2017, 2020 ADLINK Technology Inc.
+#
+# This program and the accompanying materials are made available under the
+# terms of the Eclipse Public License 2.0 which is available at
+# http://www.eclipse.org/legal/epl-2.0, or the Apache License, Version 2.0
+# which is available at https://www.apache.org/licenses/LICENSE-2.0.
+#
+# SPDX-License-Identifier: EPL-2.0 OR Apache-2.0
+#
+# Contributors:
+#   ADLINK zenoh team, <zenoh@adlink-labs.tech>
+#
+[package]
+name = "zenoh_backend_file_system"
+version = "0.5.0-beta.6"
+authors = ["kydos <angelo@icorsaro.net>",
+           "Julien Enoch <julien@enoch.fr>",
+           "Olivier Hécart <olivier.hecart@adlinktech.com>",
+		   "Luca Cominardi <luca.cominardi@adlinktech.com>"]
+edition = "2018"
+
+[lib]
+name = "zbackend_fs"
+crate-type = ["cdylib"]
+
+[dependencies]
+# TODO: set zenoh version when 0.5.0-beta.6 is released
+zenoh_backend_traits = { git = "https://github.com/eclipse-zenoh/zenoh.git" }
+zenoh = { git = "https://github.com/eclipse-zenoh/zenoh.git" }
+zenoh-util = { git = "https://github.com/eclipse-zenoh/zenoh.git" }
+uhlc = "0.2"
+async-trait = "0.1"
+lazy_static = "1.4.0"
+regex = "1"
+env_logger = "0.7.1"
+log = "0.4"
+home = "0.5"
+tempfile = "3.1"
+walkdir = "2.3"
+mime_guess = "2.0.3"
+rocksdb = "0.15.0"
+
+
+[dependencies.async-std]
+version = "=1.6.5"
+features = ["unstable"]
