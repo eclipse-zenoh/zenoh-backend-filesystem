@@ -7,7 +7,7 @@ apiVersion: v1
 kind: Pod
 spec:
   containers:
-  - name: zenoh-dev-manylinux2010-x86_64-gnu
+  - name: x86-64-gnu
     image: adlinktech/zenoh-dev-manylinux2010-x86_64-gnu
     command:
     - cat
@@ -70,7 +70,7 @@ spec:
 
     stage('Checkout Git TAG') {
       steps {
-        container('zenoh-dev-manylinux2010-x86_64-gnu') {
+        container('x86-64-gnu') {
           checkout([$class: 'GitSCM',
                     branches: [[name: "${params.GIT_TAG}"]],
                     doGenerateSubmoduleConfigurations: false,
