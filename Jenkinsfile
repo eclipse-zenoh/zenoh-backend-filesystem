@@ -95,7 +95,6 @@ spec:
     }
 
     stage('Parallel builds') {
-      failfast false
       parallel {
 
         stage('x86-64-musl build') {
