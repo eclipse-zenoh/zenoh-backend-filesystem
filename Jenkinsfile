@@ -9,6 +9,17 @@ spec:
   containers:
   - name: x86-64-gnu
     image: adlinktech/zenoh-dev-manylinux2010-x86_64-gnu
+    env:
+    - name: HOME
+      value: "/root"
+    command:
+    - cat
+    tty: true
+  - name: i686-gnu
+    image: adlinktech/zenoh-dev-manylinux2010-i686-gnu
+    env:
+    - name: HOME
+      value: "/root"
     command:
     - cat
     tty: true
@@ -63,6 +74,7 @@ spec:
           ls -al
           id
           echo "HOME=$HOME"
+          ls -al $HOME
           '''
         }
       }
@@ -86,6 +98,40 @@ spec:
       }
     }
 
+    stage('Re-Test container') {
+      steps {
+        container('x86-64-gnu') {
+          sh '''
+          uname -a
+          env
+          pwd
+          ls -al
+          id
+          echo "HOME=$HOME"
+          ls -al $HOME
+          '''
+        }
+      }
+    }
+
+    stage('Test container 2') {
+      steps {
+        container('i686-gnu') {
+          sh '''
+          uname -a
+          env
+          pwd
+          ls -al
+          id
+          echo "HOME=$HOME"
+          ls -al $HOME
+          cargo --version
+          rustc --version
+          rustup update
+          '''
+        }
+      }
+    }
 
   }
 }
