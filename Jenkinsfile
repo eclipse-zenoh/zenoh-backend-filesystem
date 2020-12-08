@@ -31,14 +31,6 @@ spec:
     command:
     - cat
     tty: true
-  - name: aarch64-gnu
-    image: adlinktech/zenoh-dev-manylinux2014-aarch64-gnu
-    env:
-    - name: HOME
-      value: "/root"
-    command:
-    - cat
-    tty: true
 """
     }
   }
@@ -94,8 +86,8 @@ spec:
       }
     }
 
-    // stage('Parallel builds') {
-    //   parallel {
+    stage('Parallel builds') {
+      parallel {
 
         stage('x86-64-musl build') {
           steps {
@@ -145,23 +137,23 @@ spec:
           }
         }
 
-        stage('aarch64-gnu build') {
-          steps {
-            container('aarch64-gnu') {
-              sh '''
-              uname -a
-              ls -al
-              git log -n 3
-              chmod -R g+w ~/.cargo/ ~/.rustup/
-              rustup update
-              cargo --version
-              rustc --version
-              '''
-            }
-          }
-        }
-    //   }
-    // }
+        // stage('aarch64-gnu build') {
+        //   steps {
+        //     container('aarch64-gnu') {
+        //       sh '''
+        //       uname -a
+        //       ls -al
+        //       git log -n 3
+        //       chmod -R g+w ~/.cargo/ ~/.rustup/
+        //       rustup update
+        //       cargo --version
+        //       rustc --version
+        //       '''
+        //     }
+        //   }
+        // }
+      }
+    }
 
   }
 }
