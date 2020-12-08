@@ -7,6 +7,14 @@ apiVersion: v1
 kind: Pod
 spec:
   containers:
+  - name: x86-64-musl
+    image: adlinktech/zenoh-dev-x86_64-unknown-linux-musl
+    env:
+    - name: HOME
+      value: "/root"
+    command:
+    - cat
+    tty: true
   - name: x86-64-gnu
     image: adlinktech/zenoh-dev-manylinux2010-x86_64-gnu
     env:
@@ -17,6 +25,14 @@ spec:
     tty: true
   - name: i686-gnu
     image: adlinktech/zenoh-dev-manylinux2010-i686-gnu
+    env:
+    - name: HOME
+      value: "/root"
+    command:
+    - cat
+    tty: true
+  - name: aarch64-gnu
+    image: adlinktech/zenoh-dev-manylinux2014-aarch64-gnu
     env:
     - name: HOME
       value: "/root"
@@ -64,71 +80,86 @@ spec:
   }
 
   stages {
-    stage('Test container') {
-      steps {
-        container('x86-64-gnu') {
-          sh '''
-          uname -a
-          env
-          pwd
-          ls -al
-          id
-          echo "HOME=$HOME"
-          ls -al $HOME
-          '''
-        }
-      }
-    }
 
     stage('Checkout Git TAG') {
       steps {
-        container('x86-64-gnu') {
-          checkout([$class: 'GitSCM',
-                    branches: [[name: "${params.GIT_TAG}"]],
-                    doGenerateSubmoduleConfigurations: false,
-                    extensions: [],
-                    gitTool: 'Default',
-                    submoduleCfg: [],
-                    userRemoteConfigs: [[url: 'https://github.com/eclipse-zenoh/zenoh-backend-filesystem.git']]
-                  ])
-          sh '''
-          ls -al
-          '''
-        }
+        checkout([$class: 'GitSCM',
+                  branches: [[name: "${params.GIT_TAG}"]],
+                  doGenerateSubmoduleConfigurations: false,
+                  extensions: [],
+                  gitTool: 'Default',
+                  submoduleCfg: [],
+                  userRemoteConfigs: [[url: 'https://github.com/eclipse-zenoh/zenoh-backend-filesystem.git']]
+                ])
       }
     }
 
-    stage('Re-Test container') {
-      steps {
-        container('x86-64-gnu') {
-          sh '''
-          uname -a
-          env
-          pwd
-          ls -al
-          id
-          echo "HOME=$HOME"
-          ls -al $HOME
-          '''
-        }
-      }
-    }
+    stage('Parallel builds') {
+      failfast false
+      parallel {
 
-    stage('Test container 2') {
-      steps {
-        container('i686-gnu') {
-          sh '''
-          uname -a
-          env
-          pwd
-          ls -al
-          id
-          echo "HOME=$HOME"
-          ls -al $HOME
-          cargo --version
-          rustc --version
-          rustup update
-          '''
+        stage('x86-64-musl build') {
+          steps {
+            container('x86-64-musl') {
+              sh '''
+              uname -a
+              ls -al
+              git log -n 3
+              chmod -R g+w ~/.cargo/ ~/.rustup/
+              rustup update
+              cargo --version
+              rustc --version
+              '''
+            }
+          }
+        }
+
+        stage('x86-64-gnu build') {
+          steps {
+            container('x86-64-gnu') {
+              sh '''
+              uname -a
+              ls -al
+              git log -n 3
+              chmod -R g+w ~/.cargo/ ~/.rustup/
+              rustup update
+              cargo --version
+              rustc --version
+              '''
+            }
+          }
+        }
+
+        stage('i686-gnu build') {
+          steps {
+            container('i686-gnu') {
+              sh '''
+              uname -a
+              ls -al
+              git log -n 3
+              chmod -R g+w ~/.cargo/ ~/.rustup/
+              rustup update
+              cargo --version
+              rustc --version
+              '''
+            }
+          }
+        }
+
+        stage('aarch64-gnu build') {
+          steps {
+            container('aarch64-gnu') {
+              sh '''
+              uname -a
+              ls -al
+              git log -n 3
+              chmod -R g+w ~/.cargo/ ~/.rustup/
+              rustup update
+              cargo --version
+              rustc --version
+              '''
+            }
+          }
         }
       }
     }
