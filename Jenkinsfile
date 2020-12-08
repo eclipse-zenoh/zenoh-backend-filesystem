@@ -55,7 +55,7 @@ spec:
   stages {
     stage('Test container') {
       steps {
-        container('zenoh-dev-manylinux2010-x86_64-gnu') {
+        container('x86-64-gnu') {
           sh '''
           uname -a
           env
