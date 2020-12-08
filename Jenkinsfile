@@ -94,8 +94,8 @@ spec:
       }
     }
 
-    stage('Parallel builds') {
-      parallel {
+    // stage('Parallel builds') {
+    //   parallel {
 
         stage('x86-64-musl build') {
           steps {
@@ -160,8 +160,8 @@ spec:
             }
           }
         }
-      }
-    }
+    //   }
+    // }
 
   }
 }
