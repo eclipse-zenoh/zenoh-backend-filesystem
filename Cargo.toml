@@ -12,7 +12,7 @@
 #   ADLINK zenoh team, <zenoh@adlink-labs.tech>
 #
 [package]
-name = "zenoh_backend_file_system"
+name = "zenoh_backend_filesystem"
 version = "0.5.0-beta.6"
 authors = ["kydos <angelo@icorsaro.net>",
            "Julien Enoch <julien@enoch.fr>",
@@ -45,3 +45,11 @@ rocksdb = "0.15.0"
 [dependencies.async-std]
 version = "=1.6.5"
 features = ["unstable"]
+
+[package.metadata.deb]
+name = "zenoh-backend-filesystem"
+maintainer = "zenoh-dev@eclipse.org"
+copyright = "2017, 2020 ADLINK Technology Inc."
+section = "net"
+license-file = ["LICENSE", "0"]
+depends = "zenoh-storages"
