@@ -1,0 +1,25 @@
+version: "3.9"
+
+services:
+  zenoh:
+    image: eclipse/zenoh
+    restart: unless-stopped
+    ports:
+      - 7447:7447
+      - 7447:7447/udp
+      - 8000:8000
+    volumes:
+      - ./zenoh_docker:/root/.zenoh
+      - ./zenoh_filesystem:/filesystem
+    environment:
+      - RUST_LOG=debug
+      - ZBACKEND_FS_ROOT=/filesystem
+    networks:
+      - zenoh-nw
+
+volumes:
+  influxdb-volume:
+
+networks:
+  zenoh-nw:
+    driver: bridge

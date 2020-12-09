@@ -14,24 +14,48 @@ See the [zenoh documentation](http://zenoh.io/docs/manual/backends/) for more de
 This backend relies on the host's file system to implement the storages.
 Its library name (without OS specific prefix and extension) that zenoh will rely on to find it and load it is **`zbackend_fs`**.
 
+:point_right: **Download:** https://download.eclipse.org/zenoh/zenoh-backend-filesystem/
+
 -------------------------------
 ## **Examples of usage**
+
+Prerequisites:
+ - You have a zenoh router running, and the `zbackend_fs` library file is available in `~/.zenoh/lib`.
+ - Declare the `ZBACKEND_FS_ROOT` environment variable to the directory where you want the files to be stored (or exposed from).
+   If you don't declare it, the `~/.zenoh/zbackend_fs` directory will be used.
 
 Using `curl` on the zenoh router to add backend and storages:
 ```bash
 # Add a backend that will have all its storages storing data in subdirectories of ${ZBACKEND_FS_ROOT} directory.
-# ${ZBACKEND_FS_ROOT} is an environment variable that must be set before starting the zenoh router.
-# If not set, it defaults to "~/.zenoh/zbackend_fs/"
 curl -X PUT -H 'content-type:application/properties' http://localhost:8000/@/router/local/plugin/storages/backend/fs
 
 # Add a storage on /demo/example/** storing data in files under ${ZBACKEND_FS_ROOT}/test/ directory
 # We use 'path_prefix=/demo/example' thus a zenoh path "/demo/example/a/b" will be stored as "${ZBACKEND_FS_ROOT}/test/a/b"
 curl -X PUT -H 'content-type:application/properties' -d "path_expr=/demo/example/**;path_prefix=/demo/example;dir=test" http://localhost:8000/@/router/local/plugin/storages/backend/fs/storage/example
 
+# Put values that will be stored under ${ZBACKEND_FS_ROOT}/test
+curl -X PUT -d "TEST-1" http://localhost:8000/demo/example/test-1
+curl -X PUT -d "B" http://localhost:8000/demo/example/a/b
+
+# Retrive the values
+curl http://localhost:8000/demo/example/**
+
 # Add a storage that will expose the same files than an Apache HTTP server, in read-only mode
 # this assumes that ${ZBACKEND_FS_ROOT} is set to the Apache DocumentRoot (e.g. "/usr/web")
 curl -X PUT -H 'content-type:application/properties' -d "path_expr=/www.test.org/**;path_prefix=/www.test.org;dir=test.org;read_only" http://localhost:8000/@/router/local/plugin/storages/backend/fs/storage/test.org
 ```
+
+Alternatively, you can test the zenoh router in a Docker container:
+ - Download the [docker-compose.yml](https://github.com/eclipse-zenoh/zenoh-backend-filesystem/blob/master/docker-compose.yml) file
+ - In the same directory, create the `./zenoh_docker/lib` sub-directories and place the `libzbackend_fs.so` library
+   for `x86_64-unknown-linux-musl` target within.
+ - Also create a `./zenoh_filesystem/test` directory that will be used for the storage.
+ - Start the containers running
+   ```bash
+   docker-compose up -d
+   ```
+ - Run the `curl` commands above, and explore the resulting file in `./zenoh_filesystem/test`
+
 
 -------------------------------
 ## **Properties for Backend creation**
