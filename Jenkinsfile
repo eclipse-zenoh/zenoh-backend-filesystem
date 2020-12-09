@@ -64,7 +64,7 @@ pipeline {
       when { expression { return params.BUILD_MACOSX }}
       steps {
         sh '''
-        cargo build --release
+        cargo build --release -vv
         cargo test --release
         tar -czvf zenoh-backend-filesystem-${LABEL}-macosx${MACOSX_DEPLOYMENT_TARGET}-x86-64.tgz --strip-components 2 target/release/*.dylib
         '''
@@ -161,7 +161,7 @@ pipeline {
         sshagent ( ['projects-storage.eclipse.org-bot-ssh']) {
           sh '''
             ssh genie.zenoh@projects-storage.eclipse.org mkdir -p /home/data/httpd/download.eclipse.org/zenoh/zenoh-backend-filesystem/${LABEL}
-            scp zenoh-backend-filesystem-${LABEL}-x86_64-unknown-linux-musl.tgz target/x86_64-unknown-linux-musl/debian/*.deb genie.zenoh@projects-storage.eclipse.org:/home/data/httpd/download.eclipse.org/zenoh/zenoh-backend-filesystem/${LABEL}/
+            scp zenoh-backend-filesystem-${LABEL}-x86_64-unknown-linux-musl.tgz genie.zenoh@projects-storage.eclipse.org:/home/data/httpd/download.eclipse.org/zenoh/zenoh-backend-filesystem/${LABEL}/
           '''
         }
       }
