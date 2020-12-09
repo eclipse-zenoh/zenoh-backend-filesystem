@@ -17,9 +17,6 @@ services:
     networks:
       - zenoh-nw
 
-volumes:
-  influxdb-volume:
-
 networks:
   zenoh-nw:
     driver: bridge
