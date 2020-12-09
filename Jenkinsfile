@@ -33,7 +33,7 @@ pipeline {
   }
   environment {
       LABEL = get_label()
-      MACOSX_DEPLOYMENT_TARGET=10.7
+      MACOSX_DEPLOYMENT_TARGET=10.9
   }
 
   stages {
@@ -64,7 +64,7 @@ pipeline {
       when { expression { return params.BUILD_MACOSX }}
       steps {
         sh '''
-        cargo build --release -vv
+        cargo build --release
         cargo test --release
         tar -czvf zenoh-backend-filesystem-${LABEL}-macosx${MACOSX_DEPLOYMENT_TARGET}-x86-64.tgz --strip-components 2 target/release/*.dylib
         '''
