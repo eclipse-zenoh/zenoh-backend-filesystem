@@ -20,7 +20,7 @@ use std::fs::DirBuilder;
 use std::io::prelude::*;
 use std::path::PathBuf;
 use tempfile::tempfile_in;
-use zenoh::net::{DataInfo, RBuf, Sample};
+use zenoh::net::{DataInfo, Sample};
 use zenoh::{Change, ChangeKind, Properties, Selector, Value, ZError, ZErrorKind, ZResult};
 use zenoh_backend_traits::*;
 use zenoh_util::{zenoh_home, zerror, zerror2};
@@ -43,6 +43,7 @@ pub const PROP_STORAGE_READ_ONLY: &str = "read_only";
 pub const PROP_STORAGE_DIR: &str = "dir";
 pub const PROP_STORAGE_ON_CLOSURE: &str = "on_closure";
 pub const PROP_STORAGE_FOLLOW_LINK: &str = "follow_links";
+pub const PROP_STORAGE_KEEP_MIME: &str = "keep_mime_types";
 
 #[no_mangle]
 pub fn create_backend(properties: &Properties) -> ZResult<Box<dyn Backend>> {
@@ -114,6 +115,23 @@ impl Backend for FileSystemBackend {
                 }
             }
             None => false,
+        };
+        let keep_mime = match props.get(PROP_STORAGE_KEEP_MIME) {
+            Some(s) => {
+                if s.eq_ignore_ascii_case("true") || s.eq_ignore_ascii_case("yes") {
+                    true
+                } else if s.eq_ignore_ascii_case("false") || s.eq_ignore_ascii_case("no") {
+                    false
+                } else {
+                    return zerror!(ZErrorKind::Other {
+                        descr: format!(
+                            r#"Invalid value for File System Storage property "{}={}""#,
+                            PROP_STORAGE_KEEP_MIME, s
+                        )
+                    });
+                }
+            }
+            None => true,
         };
 
         let on_closure = match props.get(PROP_STORAGE_ON_CLOSURE) {
@@ -191,7 +209,7 @@ impl Backend for FileSystemBackend {
                 })?;
         }
 
-        let files_mgr = FilesMgr::new(base_dir, follow_links, on_closure).await?;
+        let files_mgr = FilesMgr::new(base_dir, follow_links, keep_mime, on_closure).await?;
 
         let admin_status = zenoh::utils::properties_to_json_value(&props);
         Ok(Box::new(FileSystemStorage {
@@ -226,15 +244,16 @@ impl FileSystemStorage {
     }
 
     async fn reply_with_file(&self, query: &Query, zfile: &ZFile<'_>) {
-        debug!(
-            "Replying to query on {} with file {}",
-            query.res_name(),
-            zfile
-        );
         match self.files_mgr.read_file(&zfile).await {
-            Ok(Some((content, encoding, timestamp))) => {
+            Ok(Some((value, timestamp))) => {
+                debug!(
+                    "Replying to query on {} with file {}",
+                    query.res_name(),
+                    zfile,
+                );
                 // append path_prefix to the zenoh path of this ZFile
                 let zpath = concat_str(&self.path_prefix, zfile.zpath.as_ref());
+                let (encoding, payload) = value.encode();
 
                 let data_info = DataInfo {
                     source_id: None,
@@ -248,7 +267,7 @@ impl FileSystemStorage {
                 query
                     .reply(Sample {
                         res_name: zpath,
-                        payload: RBuf::from(content),
+                        payload,
                         data_info: Some(data_info),
                     })
                     .await;

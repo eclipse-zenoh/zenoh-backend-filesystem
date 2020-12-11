@@ -80,6 +80,12 @@ Alternatively, you can test the zenoh router in a Docker container:
 
 - **`"follow_links"`** (optional) : If set to `true` the storage will follow the symbolic links. The default value is `false`.
 
+- **`"keep_mime_types"`** (optional) : When replying to a GET query with a file for which the zenoh encoding is not known, the storage guess its mime-type according to the file extension. If the mime-type doesn't correspond to a supported zenoh encoding, this option will drive the returned value:
+   - if `true` (default value): a [Custom value](https://docs.rs/zenoh/latest/zenoh/enum.Value.html#variant.Custom)
+     is returned with the description set to the mime-type.
+   - if `false`: a [Raw value](https://docs.rs/zenoh/latest/zenoh/enum.Value.html#variant.Raw) with
+     APP_OCTET_STREAM encoding is returned.
+
 -------------------------------
 ## **Behaviour of the backend**
 
