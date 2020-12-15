@@ -34,6 +34,15 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
+    # For Windows, install llvm and use a workaround to resolve link error with C:\msys64\mingw64\bin\libclang.dll
+    # Credits: https://github.com/rust-rocksdb/rust-rocksdb/pull/484
+    - name: Remove msys64
+      if: runner.os == 'Windows'
+      run: Remove-Item -LiteralPath "C:\msys64\" -Force -Recurse
+    - name: Install dependencies
+      if: runner.os == 'Windows'
+      run: choco install llvm -y
+
     - name: Install latest nightly
       uses: actions-rs/toolchain@v1
       with:
