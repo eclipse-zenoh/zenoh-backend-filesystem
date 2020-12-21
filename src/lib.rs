@@ -45,11 +45,17 @@ pub const PROP_STORAGE_ON_CLOSURE: &str = "on_closure";
 pub const PROP_STORAGE_FOLLOW_LINK: &str = "follow_links";
 pub const PROP_STORAGE_KEEP_MIME: &str = "keep_mime_types";
 
+const GIT_VERSION: &str = git_version::git_version!(prefix = "v", cargo_prefix = "v");
+lazy_static::lazy_static!(
+    static ref LONG_VERSION: String = format!("{} built with {}", GIT_VERSION, env!("RUSTC_VERSION"));
+);
+
 #[no_mangle]
-pub fn create_backend(properties: &Properties) -> ZResult<Box<dyn Backend>> {
+pub fn create_backend(_unused: &Properties) -> ZResult<Box<dyn Backend>> {
     // For some reasons env_logger is sometime not active in a loaded library.
     // Try to activate it here, ignoring failures.
     let _ = env_logger::try_init();
+    debug!("FileSystem backend {}", LONG_VERSION.as_str());
 
     let root = if let Some(dir) = std::env::var_os(SCOPE_ENV_VAR) {
         PathBuf::from(dir)
@@ -58,10 +64,11 @@ pub fn create_backend(properties: &Properties) -> ZResult<Box<dyn Backend>> {
         dir.push(DEFAULT_ROOT_DIR);
         dir
     };
-    let mut props = properties.clone();
-    props.insert("root".into(), root.to_string_lossy().into());
+    let mut properties = Properties::default();
+    properties.insert("root".into(), root.to_string_lossy().into());
+    properties.insert("version".into(), LONG_VERSION.clone());
 
-    let admin_status = zenoh::utils::properties_to_json_value(&props);
+    let admin_status = zenoh::utils::properties_to_json_value(&properties);
     Ok(Box::new(FileSystemBackend { admin_status, root }))
 }
 
@@ -208,6 +215,9 @@ impl Backend for FileSystemBackend {
                     })
                 })?;
         }
+
+        let mut props = props.clone();
+        props.insert("dir_full_path".into(), base_dir.to_string_lossy().into());
 
         let files_mgr = FilesMgr::new(base_dir, follow_links, keep_mime, on_closure).await?;
 

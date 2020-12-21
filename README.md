@@ -94,10 +94,10 @@ Each **storage** will map to a directory with path: `${ZBACKEND_FS_ROOT}/<dir>`,
   * `${ZBACKEND_FS_ROOT}` is an environment variable that could be specified before zenoh router startup.
      If this variable is not specified `${ZENOH_HOME}/zbackend_fs` will be used
      (where the default value of `${ZENOH_HOME}` is `~/.zenoh`).
-  * `<dir>` is the `"dir"` propertiy specified at storage creation.
-Each **key/value** put into the storage will map to a file within the storage's directory where:
+  * `<dir>` is the `"dir"` property specified at storage creation.
+Each zenoh **path/value** put into the storage will map to a file within the storage's directory where:
   * the file path will be `${ZBACKEND_FS_ROOT}/<dir>/<relative_zenoh_path>`, where `<relative_zenoh_path>``
-    will be the zenoh path used as key, stripped from the `"path_prefix"` property specified at storage creation.
+    will be the zenoh path, stripped from the `"path_prefix"` property specified at storage creation.
   * the content of the file will be the value written as a RawValue. I.e. the same bytes buffer that has been
     transported by zenoh. For UTF-8 compatible formats (StringUTF8, JSon, Integer, Float...) it means the file
     will be readable as a text format.
@@ -105,7 +105,7 @@ Each **key/value** put into the storage will map to a file within the storage's 
 
 ### Behaviour on deletion
 On deletion of a path, the corresponding file is removed. An entry with deletion timestamp is inserted in the
-RocksDB database (to avoid re-insertion of points with an older timestamp in case of un-ordered messages).
+RocksDB database (to avoid re-insertion of points with an older timestamp in case of un-ordered messages).  
 At regular interval, a task cleans-up the RocksDB database from entries with old timestamps that don't have a
 corresponding existing file.
 

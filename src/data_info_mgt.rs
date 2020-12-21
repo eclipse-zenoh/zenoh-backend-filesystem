@@ -124,7 +124,7 @@ impl DataInfoMgr {
                 Ok(None)
             }
             Err(e) => zerror!(ZErrorKind::Other {
-                descr: format!("Failed to save data-info for {:?}: {}", file.as_ref(), e)
+                descr: format!("Failed to get data-info for {:?}: {}", file.as_ref(), e)
             }),
         }
     }
@@ -142,7 +142,7 @@ impl DataInfoMgr {
                 Ok(None)
             }
             Err(e) => zerror!(ZErrorKind::Other {
-                descr: format!("Failed to save data-info for {:?}: {}", file.as_ref(), e)
+                descr: format!("Failed to get data-info for {:?}: {}", file.as_ref(), e)
             }),
         }
     }
@@ -151,7 +151,7 @@ impl DataInfoMgr {
 fn decode_encoding_timestamp_from_value(val: &[u8]) -> ZResult<(ZInt, Timestamp)> {
     if val.len() < MIN_VAL_LEN {
         return zerror!(ZErrorKind::Other {
-            descr: "Failed decode data-info (buffer too small)".to_string()
+            descr: "Failed to decode data-info (buffer too small)".to_string()
         });
     }
     let mut encoding_bytes = [0u8; 8];
@@ -168,7 +168,7 @@ fn decode_encoding_timestamp_from_value(val: &[u8]) -> ZResult<(ZInt, Timestamp)
 fn decode_timestamp_from_value(val: &[u8]) -> ZResult<Timestamp> {
     if val.len() < MIN_VAL_LEN {
         return zerror!(ZErrorKind::Other {
-            descr: "Failed decode data-info (buffer too small)".to_string()
+            descr: "Failed to decode data-info (buffer too small)".to_string()
         });
     }
     let mut time_bytes = [0u8; 8];
