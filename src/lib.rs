@@ -64,6 +64,8 @@ pub fn create_backend(_unused: &Properties) -> ZResult<Box<dyn Backend>> {
         dir.push(DEFAULT_ROOT_DIR);
         dir
     };
+    debug!("Using root dir: {}", root.display());
+
     let mut properties = Properties::default();
     properties.insert("root".into(), root.to_string_lossy().into());
     properties.insert("version".into(), LONG_VERSION.clone());

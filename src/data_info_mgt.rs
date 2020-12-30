@@ -28,7 +28,7 @@ use zenoh_util::{zerror, zerror2};
 // maximum size of serialized data-info: encoding (u64) + timestamp (u64 + ID at max size)
 const MAX_VAL_LEN: usize = 8 + 8 + uhlc::ID::MAX_SIZE;
 // minimum size of serialized data-info: encoding (u64) + timestamp (u64 + ID at 1 byte)
-const MIN_VAL_LEN: usize = 8 + 8 + uhlc::ID::MAX_SIZE;
+const MIN_VAL_LEN: usize = 8 + 8 + 1;
 
 lazy_static::lazy_static! {
     static ref GC_PERIOD: Duration = Duration::new(30, 0);
