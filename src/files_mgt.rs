@@ -23,7 +23,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use walkdir::{IntoIter, WalkDir};
 use zenoh::net::utils::resource_name;
 use zenoh::net::{encoding, RBuf, ZInt};
-use zenoh::{Timestamp, TimestampID, Value, ZError, ZErrorKind, ZResult};
+use zenoh::{Timestamp, TimestampId, Value, ZError, ZErrorKind, ZResult};
 use zenoh_util::{zerror, zerror2};
 
 use crate::data_info_mgt::*;
@@ -330,7 +330,7 @@ impl FilesMgr {
             .unwrap_or_else(|_| SystemTime::now());
         Ok(Timestamp::new(
             sys_time.duration_since(UNIX_EPOCH).unwrap().into(),
-            TimestampID::new(1, [0u8; TimestampID::MAX_SIZE]),
+            TimestampId::new(1, [0u8; TimestampId::MAX_SIZE]),
         ))
     }
 

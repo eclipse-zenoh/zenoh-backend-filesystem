@@ -331,7 +331,7 @@ impl Storage for FileSystemStorage {
 
         // Store or delete the sample depending the ChangeKind
         match change.kind {
-            ChangeKind::PUT => {
+            ChangeKind::Put => {
                 if !self.read_only {
                     // check that there is a value for this PUT sample
                     if change.value.is_none() {
@@ -358,7 +358,7 @@ impl Storage for FileSystemStorage {
                     Ok(())
                 }
             }
-            ChangeKind::DELETE => {
+            ChangeKind::Delete => {
                 if !self.read_only {
                     // delete file
                     self.files_mgr.delete_file(&zfile, change.timestamp).await
@@ -370,7 +370,7 @@ impl Storage for FileSystemStorage {
                     Ok(())
                 }
             }
-            ChangeKind::PATCH => {
+            ChangeKind::Patch => {
                 warn!("Received PATCH for {}: not yet supported", change.path);
                 Ok(())
             }
