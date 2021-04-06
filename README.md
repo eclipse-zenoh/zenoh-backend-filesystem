@@ -67,7 +67,7 @@ Alternatively, you can test the zenoh router in a Docker container:
 
 - **`"path_expr"`** (**required**) : the Storage's [Path Expression](../abstractions#path-expression)
 
-- **`"path_prefix"`** (optional) : a prefix of the `"path_expr"` that will be stripped from each path to store.  
+- **`"path_prefix"`** (**required**) : a prefix of the `"path_expr"` that will be stripped from each path to store.  
   _Example: with `"path_expr"="/demo/example/**"` and `"path_prefix"="/demo/example/"` the path `"/demo/example/foo/bar"` will be stored as key: `"foo/bar"`. But replying to a get on `"/demo/**"`, the key `"foo/bar"` will be transformed back to the original path (`"/demo/example/foo/bar"`)._
 
 - **`"dir"`** (**required**) : The directory that will be used to store
