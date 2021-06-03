@@ -30,7 +30,7 @@ zenoh = { git =  "https://github.com/eclipse-zenoh/zenoh" }
 zenoh-util = { git =  "https://github.com/eclipse-zenoh/zenoh" }
 async-std = "=1.9.0"
 async-trait = "0.1.42"
-uhlc = "0.2.1"
+uhlc = "0.3.0"
 lazy_static = "1.4.0"
 regex = "1"
 env_logger = "0.8.2"
@@ -40,7 +40,7 @@ home = "0.5.3"
 tempfile = "3.2.0"
 walkdir = "2.3"
 mime_guess = "2.0.3"
-rocksdb = "0.15.0"
+rocksdb = "0.16.0"
 
 [build-dependencies]
 rustc_version = "0.3"

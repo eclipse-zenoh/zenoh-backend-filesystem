@@ -123,7 +123,7 @@ impl FilesMgr {
                 descr: format!("Failed to write in file {:?}: {}", file, e)
             })
         })?;
-        for slice in content.get_slices() {
+        for slice in content.as_slices() {
             f.write_all(slice.as_slice()).map_err(|e| {
                 zerror2!(ZErrorKind::Other {
                     descr: format!("Failed to write in file {:?}: {}", file, e)
