@@ -22,7 +22,7 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use walkdir::{IntoIter, WalkDir};
 use zenoh::net::utils::resource_name;
-use zenoh::net::{encoding, RBuf, ZInt};
+use zenoh::net::{encoding, ZBuf, ZInt};
 use zenoh::{Timestamp, TimestampId, Value, ZError, ZErrorKind, ZResult};
 use zenoh_util::{zerror, zerror2};
 
@@ -101,7 +101,7 @@ impl FilesMgr {
     pub(crate) async fn write_file(
         &self,
         zfile: &ZFile<'_>,
-        content: RBuf,
+        content: ZBuf,
         encoding: ZInt,
         timestamp: Timestamp,
     ) -> ZResult<()> {
@@ -123,7 +123,7 @@ impl FilesMgr {
                 descr: format!("Failed to write in file {:?}: {}", file, e)
             })
         })?;
-        for slice in content.as_slices() {
+        for slice in content {
             f.write_all(slice.as_slice()).map_err(|e| {
                 zerror2!(ZErrorKind::Other {
                     descr: format!("Failed to write in file {:?}: {}", file, e)

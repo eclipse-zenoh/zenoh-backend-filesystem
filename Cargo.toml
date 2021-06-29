@@ -25,9 +25,9 @@ name = "zbackend_fs"
 crate-type = ["cdylib"]
 
 [dependencies]
-zenoh_backend_traits = { git =  "https://github.com/eclipse-zenoh/zenoh" }
-zenoh = { git =  "https://github.com/eclipse-zenoh/zenoh" }
-zenoh-util = { git =  "https://github.com/eclipse-zenoh/zenoh" }
+zenoh_backend_traits = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "master" }
+zenoh = { git =  "https://github.com/eclipse-zenoh/zenoh", branch = "master" }
+zenoh-util = { git =  "https://github.com/eclipse-zenoh/zenoh", branch = "master" }
 async-std = "=1.9.0"
 async-trait = "0.1.42"
 uhlc = "0.3.0"
@@ -43,7 +43,7 @@ mime_guess = "2.0.3"
 rocksdb = "0.16.0"
 
 [build-dependencies]
-rustc_version = "0.3"
+rustc_version = "0.4.0"
 
 [package.metadata.deb]
 name = "zenoh-backend-filesystem"

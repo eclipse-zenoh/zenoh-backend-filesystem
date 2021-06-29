@@ -266,16 +266,10 @@ impl FileSystemStorage {
                 let zpath = concat_str(&self.path_prefix, zfile.zpath.as_ref());
                 let (encoding, payload) = value.encode();
 
-                let data_info = DataInfo {
-                    source_id: None,
-                    source_sn: None,
-                    first_router_id: None,
-                    first_router_sn: None,
-                    timestamp: Some(timestamp),
-                    kind: None,
-                    encoding: Some(encoding),
-                    is_shm: false,
-                };
+                let mut data_info = DataInfo::new();
+                data_info.timestamp = Some(timestamp);
+                data_info.encoding = Some(encoding);
+
                 query
                     .reply(Sample {
                         res_name: zpath,
@@ -344,7 +338,7 @@ impl Storage for FileSystemStorage {
                         });
                     }
 
-                    // get the encoding and buffer from the value (RawValue => direct access to inner RBuf)
+                    // get the encoding and buffer from the value (RawValue => direct access to inner ZBuf)
                     let (encoding, buf) = change.value.unwrap().encode();
 
                     // write file
