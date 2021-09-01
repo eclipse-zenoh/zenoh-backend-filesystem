@@ -255,7 +255,7 @@ impl FileSystemStorage {
     }
 
     async fn reply_with_file(&self, query: &Query, zfile: &ZFile<'_>) {
-        match self.files_mgr.read_file(&zfile).await {
+        match self.files_mgr.read_file(zfile).await {
             Ok(Some((value, timestamp))) => {
                 debug!(
                     "Replying to query on {} with file {}",

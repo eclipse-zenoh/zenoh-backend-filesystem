@@ -82,7 +82,7 @@ impl FilesMgr {
     }
 
     pub(crate) fn base_dir(&self) -> &Path {
-        &self.base_dir.as_path()
+        self.base_dir.as_path()
     }
 
     pub(crate) fn to_zfile<'a>(&self, zpath: &'a str) -> ZFile<'a> {
@@ -397,7 +397,6 @@ impl<'a> Iterator for FilesIterator<'a> {
                         if e.file_name().to_str().unwrap_or_default() == DataInfoMgr::DB_FILENAME {
                             self.walk_iter.skip_current_dir();
                         }
-                        continue;
                     } else {
                         let fspath = e.into_path();
                         if let Some(s) = fspath.to_str() {
@@ -420,8 +419,8 @@ impl<'a> Iterator for FilesIterator<'a> {
                                 self.zpath_expr, fspath
                             );
                         };
-                        continue;
                     }
+                    continue;
                 }
                 None => return None,
                 Some(Err(err)) => {
