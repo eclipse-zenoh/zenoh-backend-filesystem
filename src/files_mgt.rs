@@ -20,10 +20,12 @@ use std::io::prelude::*;
 use std::iter::Iterator;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
+use uhlc::Timestamp;
 use walkdir::{IntoIter, WalkDir};
-use zenoh::net::utils::resource_name;
-use zenoh::net::{encoding, ZBuf, ZInt};
-use zenoh::{Timestamp, TimestampId, Value, ZError, ZErrorKind, ZResult};
+use zenoh::buf::ZBuf;
+use zenoh::net::protocol::core::rname;
+use zenoh::prelude::*;
+use zenoh::time::TimestampId;
 use zenoh_util::{zerror, zerror2};
 
 use crate::data_info_mgt::*;
@@ -43,11 +45,6 @@ impl fmt::Display for ZFile<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self.fspath)
     }
-}
-
-enum Encoding {
-    ZCode(ZInt),
-    Mime(String),
 }
 
 pub(crate) struct FilesMgr {
@@ -102,8 +99,8 @@ impl FilesMgr {
         &self,
         zfile: &ZFile<'_>,
         content: ZBuf,
-        encoding: ZInt,
-        timestamp: Timestamp,
+        encoding: &Encoding,
+        timestamp: &Timestamp,
     ) -> ZResult<()> {
         let file = &zfile.fspath;
 
@@ -137,7 +134,11 @@ impl FilesMgr {
             .await
     }
 
-    pub(crate) async fn delete_file(&self, zfile: &ZFile<'_>, timestamp: Timestamp) -> ZResult<()> {
+    pub(crate) async fn delete_file(
+        &self,
+        zfile: &ZFile<'_>,
+        timestamp: &Timestamp,
+    ) -> ZResult<()> {
         let file = &zfile.fspath;
 
         // Delete file
@@ -162,7 +163,9 @@ impl FilesMgr {
         }
 
         // save timestamp in data-info (encoding is not used)
-        self.data_info_mgr.put_data_info(file, 0, timestamp).await
+        self.data_info_mgr
+            .put_data_info(file, &Encoding::EMPTY, timestamp)
+            .await
     }
 
     // Read a file and return it's content (as Vec<u8>), encoding and timestamp.
@@ -186,23 +189,13 @@ impl FilesMgr {
                         } else {
                             let (encoding, timestamp) =
                                 self.get_encoding_and_timestamp(zfile).await?;
-                            // Depending on found encoding and keep_mime flag, return a Raw or Custom Value
-                            match (encoding, self.keep_mime) {
-                                (Encoding::ZCode(code), _) => {
-                                    Ok(Some((Value::Raw(code, content.into()), timestamp)))
-                                }
-                                (Encoding::Mime(mime), true) => Ok(Some((
-                                    Value::Custom {
-                                        encoding_descr: mime,
-                                        data: content.into(),
-                                    },
-                                    timestamp,
-                                ))),
-                                (Encoding::Mime(_), false) => Ok(Some((
-                                    Value::Raw(encoding::APP_OCTET_STREAM, content.into()),
-                                    timestamp,
-                                ))),
-                            }
+                            Ok(Some((
+                                Value {
+                                    payload: content.into(),
+                                    encoding,
+                                },
+                                timestamp,
+                            )))
                         }
                     } else {
                         zerror!(ZErrorKind::Other {
@@ -267,25 +260,15 @@ impl FilesMgr {
         let file = &zfile.fspath;
         // try to get Encoding and Timestamp from data_info_mgr
         match self.data_info_mgr.get_encoding_and_timestamp(file).await? {
-            Some((code, timestamp)) => Ok((Encoding::ZCode(code), timestamp)),
+            Some((encoding, timestamp)) => Ok((encoding, timestamp)),
             None => {
                 trace!("data-info for {:?} not found; fallback to metadata", file);
-                // fallback: guess mime type from file extension
-                let mime_type = mime_guess::from_path(&file).first_or_octet_stream();
-                let mime_str = mime_type.essence_str();
-                trace!("Found mime-type {} for {:?}", mime_type, file);
-                // transform mime type into zenoh encoding flag if possible
-                let encoding = match encoding::from_str(mime_str) {
-                    Ok(code) => Encoding::ZCode(code),
-                    Err(_) => {
-                        if self.keep_mime {
-                            // keep mime type
-                            Encoding::Mime(mime_str.into())
-                        } else {
-                            // drop mime type, consider payload as octets stream
-                            Encoding::ZCode(encoding::APP_OCTET_STREAM)
-                        }
-                    }
+                let encoding = if self.keep_mime {
+                    // fallback: guess mime type from file extension
+                    let mime_type = mime_guess::from_path(&file).first_or_octet_stream();
+                    Encoding::from(mime_type.essence_str().to_string())
+                } else {
+                    Encoding::APP_OCTET_STREAM
                 };
 
                 // fallback: get timestamp from file's metadata
@@ -405,7 +388,7 @@ impl<'a> Iterator for FilesIterator<'a> {
                             let zpath =
                                 Cow::from(fspath_to_zpath(&s[self.base_dir_len..]).into_owned());
                             // convert it to zenoh path for matching test with zpath_expr
-                            if resource_name::intersect(zpath.as_ref(), self.zpath_expr) {
+                            if rname::intersect(zpath.as_ref(), self.zpath_expr) {
                                 // matching file; return a ZFile
                                 let zfile = ZFile {
                                     zpath,

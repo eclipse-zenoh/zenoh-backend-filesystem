@@ -15,20 +15,13 @@ use async_std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use log::{trace, warn};
 use rocksdb::{IteratorMode, DB};
-use std::convert::TryFrom;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use uhlc::NTP64;
-use zenoh::net::ZInt;
-use zenoh::{Timestamp, ZError, ZErrorKind, ZResult};
+use uhlc::{Timestamp, NTP64};
+use zenoh::buf::{WBuf, ZBuf};
+use zenoh::prelude::*;
 use zenoh_util::collections::{Timed, TimedEvent, Timer};
 use zenoh_util::{zerror, zerror2};
-
-// maximum size of serialized data-info: encoding (u64) + timestamp (u64 + ID at max size)
-const MAX_VAL_LEN: usize = 8 + 8 + uhlc::ID::MAX_SIZE;
-// minimum size of serialized data-info: encoding (u64) + timestamp (u64 + ID at 1 byte)
-const MIN_VAL_LEN: usize = 8 + 8 + 1;
 
 lazy_static::lazy_static! {
     static ref GC_PERIOD: Duration = Duration::new(30, 0);
@@ -84,37 +77,37 @@ impl DataInfoMgr {
     pub(crate) async fn put_data_info<P: AsRef<Path>>(
         &self,
         file: P,
-        encoding: ZInt,
-        timestamp: Timestamp,
+        encoding: &Encoding,
+        timestamp: &Timestamp,
     ) -> ZResult<()> {
         let key = file.as_ref().to_string_lossy();
         trace!("Put data-info for {}", key);
-        let mut value: Vec<u8> = Vec::with_capacity(MAX_VAL_LEN);
-        value
-            .write_all(&encoding.to_ne_bytes())
-            .and_then(|()| value.write_all(&timestamp.get_time().as_u64().to_ne_bytes()))
-            .and_then(|()| value.write_all(timestamp.get_id().as_slice()))
-            .map_err(|e| {
-                zerror2!(ZErrorKind::Other {
-                    descr: format!("Failed to encode data-info for {:?}: {}", file.as_ref(), e)
-                })
-            })?;
-
-        self.db
-            .lock()
-            .await
-            .put(key.as_bytes(), value)
-            .map_err(|e| {
-                zerror2!(ZErrorKind::Other {
-                    descr: format!("Failed to save data-info for {:?}: {}", file.as_ref(), e)
-                })
+        let mut value: WBuf = WBuf::new(32, true);
+        // note: encode timestamp at first for faster decoding when only this one is required
+        let write_ok = value.write_timestamp(timestamp)
+            && value.write_zint(encoding.prefix)
+            && value.write_string(&encoding.suffix);
+        if !write_ok {
+            zerror!(ZErrorKind::Other {
+                descr: format!("Failed to encode data-info for {:?}", file.as_ref())
             })
+        } else {
+            self.db
+                .lock()
+                .await
+                .put(key.as_bytes(), value.get_first_slice(..))
+                .map_err(|e| {
+                    zerror2!(ZErrorKind::Other {
+                        descr: format!("Failed to save data-info for {:?}: {}", file.as_ref(), e)
+                    })
+                })
+        }
     }
 
     pub(crate) async fn get_encoding_and_timestamp<P: AsRef<Path>>(
         &self,
         file: P,
-    ) -> ZResult<Option<(ZInt, Timestamp)>> {
+    ) -> ZResult<Option<(Encoding, Timestamp)>> {
         let key = file.as_ref().to_string_lossy();
         trace!("Get data-info for {}", key);
         match self.db.lock().await.get_pinned(key.as_bytes()) {
@@ -148,34 +141,40 @@ impl DataInfoMgr {
     }
 }
 
-fn decode_encoding_timestamp_from_value(val: &[u8]) -> ZResult<(ZInt, Timestamp)> {
-    if val.len() < MIN_VAL_LEN {
-        return zerror!(ZErrorKind::Other {
-            descr: "Failed to decode data-info (buffer too small)".to_string()
-        });
-    }
-    let mut encoding_bytes = [0u8; 8];
-    encoding_bytes.clone_from_slice(&val[..8]);
-    let encoding = ZInt::from_ne_bytes(encoding_bytes);
-    let mut time_bytes = [0u8; 8];
-    time_bytes.clone_from_slice(&val[8..16]);
-    let time = u64::from_ne_bytes(time_bytes);
-    let id = uhlc::ID::try_from(&val[16..]).unwrap();
-    let timestamp = Timestamp::new(NTP64(time), id);
-    Ok((encoding, timestamp))
+fn decode_encoding_timestamp_from_value(val: &[u8]) -> ZResult<(Encoding, Timestamp)> {
+    let mut buf = ZBuf::from(val);
+    let timestamp = buf.read_timestamp().ok_or_else(|| {
+        zerror2!(ZErrorKind::Other {
+            descr: "Failed to decode data-info (timestamp)".to_string()
+        })
+    })?;
+    let encoding_prefix = buf.read_zint().ok_or_else(|| {
+        zerror2!(ZErrorKind::Other {
+            descr: "Failed to decode data-info (encoding.prefix)".to_string()
+        })
+    })?;
+    let encoding_suffix = buf.read_string().ok_or_else(|| {
+        zerror2!(ZErrorKind::Other {
+            descr: "Failed to decode data-info (encoding.suffix)".to_string()
+        })
+    })?;
+    Ok((
+        Encoding {
+            prefix: encoding_prefix,
+            suffix: encoding_suffix.into(),
+        },
+        timestamp,
+    ))
 }
 
 fn decode_timestamp_from_value(val: &[u8]) -> ZResult<Timestamp> {
-    if val.len() < MIN_VAL_LEN {
-        return zerror!(ZErrorKind::Other {
-            descr: "Failed to decode data-info (buffer too small)".to_string()
-        });
-    }
-    let mut time_bytes = [0u8; 8];
-    time_bytes.clone_from_slice(&val[8..16]);
-    let time = u64::from_ne_bytes(time_bytes);
-    let id = uhlc::ID::try_from(&val[16..]).unwrap();
-    Ok(Timestamp::new(NTP64(time), id))
+    let mut buf = ZBuf::from(val);
+    let timestamp = buf.read_timestamp().ok_or_else(|| {
+        zerror2!(ZErrorKind::Other {
+            descr: "Failed to decode data-info (timestamp)".to_string()
+        })
+    })?;
+    Ok(timestamp)
 }
 
 // Periodic event cleaning-up data info for no-longer existing files

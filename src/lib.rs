@@ -14,13 +14,11 @@
 
 use async_trait::async_trait;
 use log::{debug, warn};
-use std::convert::TryFrom;
 use std::fs::DirBuilder;
 use std::io::prelude::*;
 use std::path::PathBuf;
 use tempfile::tempfile_in;
-use zenoh::net::{DataInfo, Sample};
-use zenoh::{Change, ChangeKind, Properties, Selector, Value, ZError, ZErrorKind, ZResult};
+use zenoh::{prelude::*, time::new_reception_timestamp};
 use zenoh_backend_traits::*;
 use zenoh_util::{zenoh_home, zerror, zerror2};
 
@@ -69,7 +67,7 @@ pub fn create_backend(_unused: &Properties) -> ZResult<Box<dyn Backend>> {
     properties.insert("root".into(), root.to_string_lossy().into());
     properties.insert("version".into(), LONG_VERSION.clone());
 
-    let admin_status = zenoh::utils::properties_to_json_value(&properties);
+    let admin_status = zenoh::properties::properties_to_json_value(&properties);
     Ok(Box::new(FileSystemBackend { admin_status, root }))
 }
 
@@ -222,7 +220,7 @@ impl Backend for FileSystemBackend {
 
         let files_mgr = FilesMgr::new(base_dir, follow_links, keep_mime, on_closure).await?;
 
-        let admin_status = zenoh::utils::properties_to_json_value(&props);
+        let admin_status = zenoh::properties::properties_to_json_value(&props);
         Ok(Box::new(FileSystemStorage {
             admin_status,
             path_prefix,
@@ -259,29 +257,19 @@ impl FileSystemStorage {
             Ok(Some((value, timestamp))) => {
                 debug!(
                     "Replying to query on {} with file {}",
-                    query.res_name(),
+                    query.selector(),
                     zfile,
                 );
                 // append path_prefix to the zenoh path of this ZFile
                 let zpath = concat_str(&self.path_prefix, zfile.zpath.as_ref());
-                let (encoding, payload) = value.encode();
-
-                let mut data_info = DataInfo::new();
-                data_info.timestamp = Some(timestamp);
-                data_info.encoding = Some(encoding);
-
                 query
-                    .reply(Sample {
-                        res_name: zpath,
-                        payload,
-                        data_info: Some(data_info),
-                    })
+                    .reply(Sample::new(zpath, value).with_timestamp(timestamp))
                     .await;
             }
             Ok(None) => (), // file not found, do nothing
             Err(e) => warn!(
                 "Replying to query on {} : failed to read file {} : {}",
-                query.res_name(),
+                query.selector(),
                 zfile,
                 e
             ),
@@ -298,12 +286,11 @@ impl Storage for FileSystemStorage {
     // When receiving a Sample (i.e. on PUT or DELETE operations)
     async fn on_sample(&mut self, sample: Sample) -> ZResult<()> {
         // transform the Sample into a Change to get kind, encoding and timestamp (not decoding => RawValue)
-        let change = Change::from_sample(sample, false)?;
+        // let change = Change::from_sample(sample, false)?;
 
         // strip path from "path_prefix" and converted to a ZFile
-        let zfile = change
-            .path
-            .as_str()
+        let zfile = sample
+            .res_name
             .strip_prefix(&self.path_prefix)
             .map(|p| self.files_mgr.to_zfile(p))
             .ok_or_else(|| {
@@ -317,33 +304,29 @@ impl Storage for FileSystemStorage {
 
         // get latest timestamp for this file (if referenced in data-info db or if exists on disk)
         // and drop incoming sample if older
+        let sample_ts = sample.timestamp.unwrap_or_else(new_reception_timestamp);
         if let Some(old_ts) = self.files_mgr.get_timestamp(&zfile).await? {
-            if change.timestamp < old_ts {
-                debug!("{} on {} dropped: out-of-date", change.kind, change.path);
+            if sample_ts < old_ts {
+                debug!(
+                    "{} on {} dropped: out-of-date",
+                    sample.kind, sample.res_name
+                );
                 return Ok(());
             }
         }
 
         // Store or delete the sample depending the ChangeKind
-        match change.kind {
-            ChangeKind::Put => {
+        match sample.kind {
+            SampleKind::Put => {
                 if !self.read_only {
-                    // check that there is a value for this PUT sample
-                    if change.value.is_none() {
-                        return zerror!(ZErrorKind::Other {
-                            descr: format!(
-                                "Received a PUT Sample without value for {}",
-                                change.path
-                            )
-                        });
-                    }
-
-                    // get the encoding and buffer from the value (RawValue => direct access to inner ZBuf)
-                    let (encoding, buf) = change.value.unwrap().encode();
-
                     // write file
                     self.files_mgr
-                        .write_file(&zfile, buf, encoding, change.timestamp)
+                        .write_file(
+                            &zfile,
+                            sample.value.payload,
+                            &sample.value.encoding,
+                            &sample_ts,
+                        )
                         .await
                 } else {
                     warn!(
@@ -353,10 +336,10 @@ impl Storage for FileSystemStorage {
                     Ok(())
                 }
             }
-            ChangeKind::Delete => {
+            SampleKind::Delete => {
                 if !self.read_only {
                     // delete file
-                    self.files_mgr.delete_file(&zfile, change.timestamp).await
+                    self.files_mgr.delete_file(&zfile, &sample_ts).await
                 } else {
                     warn!(
                         "Received DELETE for read-only Files System Storage on {:?} - ignored",
@@ -365,8 +348,8 @@ impl Storage for FileSystemStorage {
                     Ok(())
                 }
             }
-            ChangeKind::Patch => {
-                warn!("Received PATCH for {}: not yet supported", change.path);
+            SampleKind::Patch => {
+                warn!("Received PATCH for {}: not yet supported", sample.res_name);
                 Ok(())
             }
         }
@@ -375,23 +358,23 @@ impl Storage for FileSystemStorage {
     // When receiving a Query (i.e. on GET operations)
     async fn on_query(&mut self, query: Query) -> ZResult<()> {
         // get the query's Selector
-        let selector = Selector::try_from(&query)?;
+        let selector = query.selector();
 
         // get the list of sub-path expressions that will match the same stored keys than
         // the selector, if those keys had the path_prefix.
-        let path_exprs = utils::get_sub_path_exprs(selector.path_expr.as_str(), &self.path_prefix);
+        let sub_selectors = utils::get_sub_key_selectors(selector.key_selector, &self.path_prefix);
         debug!(
             "Query on {} with path_prefix={} => sub_path_exprs = {:?}",
-            selector.path_expr, self.path_prefix, path_exprs
+            selector.key_selector, self.path_prefix, sub_selectors
         );
 
-        for path_expr in path_exprs {
-            if path_expr.contains('*') {
-                self.reply_with_matching_files(&query, path_expr).await;
+        for sub_selector in sub_selectors {
+            if sub_selector.contains('*') {
+                self.reply_with_matching_files(&query, sub_selector).await;
             } else {
                 // path_expr correspond to 1 single file.
                 // Convert it to ZFile and reply it.
-                let zfile = self.files_mgr.to_zfile(path_expr);
+                let zfile = self.files_mgr.to_zfile(sub_selector);
                 self.reply_with_file(&query, &zfile).await;
             }
         }
