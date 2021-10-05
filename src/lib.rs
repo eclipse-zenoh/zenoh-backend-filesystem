@@ -285,9 +285,6 @@ impl Storage for FileSystemStorage {
 
     // When receiving a Sample (i.e. on PUT or DELETE operations)
     async fn on_sample(&mut self, sample: Sample) -> ZResult<()> {
-        // transform the Sample into a Change to get kind, encoding and timestamp (not decoding => RawValue)
-        // let change = Change::from_sample(sample, false)?;
-
         // strip path from "path_prefix" and converted to a ZFile
         let zfile = sample
             .res_name

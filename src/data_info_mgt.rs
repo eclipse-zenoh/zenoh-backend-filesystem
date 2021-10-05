@@ -17,9 +17,9 @@ use log::{trace, warn};
 use rocksdb::{IteratorMode, DB};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use uhlc::{Timestamp, NTP64};
 use zenoh::buf::{WBuf, ZBuf};
 use zenoh::prelude::*;
+use zenoh::time::{Timestamp, NTP64};
 use zenoh_util::collections::{Timed, TimedEvent, Timer};
 use zenoh_util::{zerror, zerror2};
 

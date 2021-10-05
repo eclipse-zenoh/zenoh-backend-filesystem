@@ -20,12 +20,11 @@ use std::io::prelude::*;
 use std::iter::Iterator;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
-use uhlc::Timestamp;
 use walkdir::{IntoIter, WalkDir};
 use zenoh::buf::ZBuf;
 use zenoh::net::protocol::core::rname;
 use zenoh::prelude::*;
-use zenoh::time::TimestampId;
+use zenoh::time::{Timestamp, TimestampId};
 use zenoh_util::{zerror, zerror2};
 
 use crate::data_info_mgt::*;
