@@ -361,7 +361,7 @@ impl Storage for FileSystemStorage {
         // the selector, if those keys had the path_prefix.
         let sub_selectors = utils::get_sub_key_selectors(selector.key_selector, &self.path_prefix);
         debug!(
-            "Query on {} with path_prefix={} => sub_path_exprs = {:?}",
+            "Query on {} with path_prefix={} => sub_selectors = {:?}",
             selector.key_selector, self.path_prefix, sub_selectors
         );
 
