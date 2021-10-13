@@ -114,6 +114,18 @@ impl FilesMgr {
 
         // Write file
         trace!("Write in file {:?}", file);
+        trace!("checking if exists {:?}", file.exists());
+        trace!("checking if dir {:?}", file.is_dir()); 
+        let file = if file.exists() && file.is_dir() {
+            match file.to_str(){
+                Some(x) => 
+                PathBuf::from(format!("{}__z__", x)),
+                None => file.to_path_buf(),
+            }
+        } else{
+            file.to_path_buf()
+        };
+        trace!("creating conflict dir {:?}", file);
         let mut f = File::create(&file).map_err(|e| {
             zerror2!(ZErrorKind::Other {
                 descr: format!("Failed to write in file {:?}: {}", file, e)
