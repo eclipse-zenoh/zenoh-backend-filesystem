@@ -154,25 +154,30 @@ impl FilesMgr {
     ) -> ZResult<()> {
         let file = &zfile.fspath;
 
+        let file = if file.exists() && file.is_file() {
+            file.to_path_buf()
+        } else {
+            self.get_conflict_file(file.to_path_buf())
+        };
+
         // Delete file
         trace!("Delete file {:?}", file);
         if file.exists() {
-            remove_file(file).map_err(|e| {
+            remove_file(file.to_path_buf()).map_err(|e| {
                 zerror2!(ZErrorKind::Other {
                     descr: format!("Failed to delete file {:?}: {}", file, e)
                 })
             })?;
-        }
-
-        // try to delete parent directories if empty
-        let mut f = file.as_path();
-        while let Some(parent) = f.parent() {
-            if parent != self.base_dir() && remove_dir(parent).is_ok() {
-                trace!("Removed empty dir: {:?}", parent);
-            } else {
-                break;
+            // try to delete parent directories if empty
+            let mut f = file.as_path();
+            while let Some(parent) = f.parent() {
+                if parent != self.base_dir() && remove_dir(parent).is_ok() {
+                    trace!("Removed empty dir: {:?}", parent);
+                } else {
+                    break;
+                }
+                f = parent;
             }
-            f = parent;
         }
 
         // save timestamp in data-info (encoding is not used)
