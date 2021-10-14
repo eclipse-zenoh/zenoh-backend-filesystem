@@ -186,8 +186,20 @@ impl FilesMgr {
     // Otherwise, the encoding is guessed from the file extension, and the timestamp is computed from the file's time.
     pub(crate) async fn read_file(&self, zfile: &ZFile<'_>) -> ZResult<Option<(Value, Timestamp)>> {
         let file = &zfile.fspath;
+        match self.perform_read(file.to_path_buf()).await? {
+            Some(x) => Ok(Some(x)),
+            None => self.perform_read_from_conflict(file.to_path_buf()).await,
+        }
+    }
+
+    async fn perform_read_from_conflict(&self, file:PathBuf) -> ZResult<Option<(Value, Timestamp)>> {
+        let file = self.get_conflict_file(file.to_path_buf()); 
+        self.perform_read(file.to_path_buf()).await
+    }
+
+    async fn perform_read(&self, file:PathBuf) -> ZResult<Option<(Value, Timestamp)>> {
         // consider file only is it exists, it's a file and in case of "follow_links=true" it doesn't contain symlink
-        if file.exists() && file.is_file() && (self.follow_links || !self.contains_symlink(file)) {
+        if file.exists() && file.is_file() && (self.follow_links || !self.contains_symlink(&file)) {
             match File::open(&file) {
                 Ok(mut f) => {
                     // TODO: what if file is too big ??
@@ -201,7 +213,7 @@ impl FilesMgr {
                             })
                         } else {
                             let (encoding, timestamp) =
-                                self.get_encoding_and_timestamp(zfile).await?;
+                                self.get_encoding_and_timestamp(file.to_path_buf()).await?;
                             Ok(Some((
                                 Value {
                                     payload: content.into(),
@@ -268,11 +280,10 @@ impl FilesMgr {
 
     async fn get_encoding_and_timestamp(
         &self,
-        zfile: &ZFile<'_>,
+        file: PathBuf,
     ) -> ZResult<(Encoding, Timestamp)> {
-        let file = &zfile.fspath;
         // try to get Encoding and Timestamp from data_info_mgr
-        match self.data_info_mgr.get_encoding_and_timestamp(file).await? {
+        match self.data_info_mgr.get_encoding_and_timestamp(&file).await? {
             Some((encoding, timestamp)) => Ok((encoding, timestamp)),
             None => {
                 trace!("data-info for {:?} not found; fallback to metadata", file);
