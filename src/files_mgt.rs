@@ -115,11 +115,7 @@ impl FilesMgr {
         // Write file
         trace!("Write in file {:?}", file);
         let file = if file.exists() && file.is_dir() {
-            match file.to_str(){
-                Some(x) => 
-                PathBuf::from(format!("{}__z__", x)),
-                None => file.to_path_buf(),
-            }
+            self.get_conflict_file(file.to_path_buf())
         } else{
             file.to_path_buf()
         };
@@ -139,8 +135,16 @@ impl FilesMgr {
 
         // save data-info
         self.data_info_mgr
-            .put_data_info(&zfile.fspath, encoding, timestamp)
+            .put_data_info(file, encoding, timestamp)
             .await
+    }
+
+    fn get_conflict_file(&self, file: PathBuf) -> PathBuf{
+        match file.to_str(){
+            Some(x) => 
+            PathBuf::from(format!("{}__z__", x)),
+            None => file.to_path_buf(),
+        }
     }
 
     pub(crate) async fn delete_file(
