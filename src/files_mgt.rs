@@ -139,7 +139,7 @@ impl FilesMgr {
 
         // save data-info
         self.data_info_mgr
-            .put_data_info(file, encoding, timestamp)
+            .put_data_info(&zfile.fspath, encoding, timestamp)
             .await
     }
 
