@@ -104,13 +104,52 @@ impl FilesMgr {
         let file = &zfile.fspath;
 
         // Create parent directories if needed
-        if let Some(dir) = file.parent() {
-            self.dir_builder.create(dir).map_err(|e| {
+        let parent = file.parent().unwrap();
+        let mut ancestor = parent.ancestors().collect::<Vec<_>>();
+        ancestor.reverse();
+        for a in ancestor {
+            trace!("checking ancestor {:?}", a);
+            if a.exists() && a.is_file(){
+                trace!("Conflict detected for {:?}", a);
+                let conflict_file = self.get_conflict_file(a.to_path_buf());
+                trace!("Writing to conflict free file {:?}", conflict_file);
+                //TODO: move everything related to this file to the conflict file, including rocksdb entry if present
+                let mut cf = File::create(&conflict_file).map_err(|e| {
+                    zerror2!(ZErrorKind::Other {
+                        descr: format!("Failed to write in file {:?}: {}", conflict_file, e)
+                    })
+                })?;
+                let conflict_value = match self.perform_read(a.to_path_buf()).await? {
+                    Some(val) => val.0,
+                    None => Vec::new().into(),
+                };
+                let conflict_content = conflict_value.payload;
+                for slice in conflict_content {
+                    cf.write_all(slice.as_slice()).map_err(|e| {
+                        zerror2!(ZErrorKind::Other {
+                            descr: format!("Failed to write in file {:?}: {}", conflict_file, e)
+                        })
+                    })?;
+                }
+                let (conflict_encoding, conflict_timestamp) = self.get_encoding_and_timestamp(a.to_path_buf()).await?;
+                // save data-info
+                self.data_info_mgr
+                    .put_data_info(conflict_file, &conflict_encoding, &conflict_timestamp)
+                    .await?;
+                // cleanup the previous file
+                remove_file(a.to_path_buf()).map_err(|e| {
+                    zerror2!(ZErrorKind::Other {
+                        descr: format!("Failed to delete file {:?}: {}", a, e)
+                    })
+                })?;
+            }
+        }
+
+            self.dir_builder.create(parent).map_err(|e| {
                 zerror2!(ZErrorKind::Other {
                     descr: format!("Failed to create directories for file {:?}: {}", file, e)
                 })
             })?;
-        }
 
         // Write file
         trace!("Write in file {:?}", file);
