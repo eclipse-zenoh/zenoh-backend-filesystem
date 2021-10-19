@@ -142,7 +142,7 @@ impl DataInfoMgr {
 }
 
 fn decode_encoding_timestamp_from_value(val: &[u8]) -> ZResult<(Encoding, Timestamp)> {
-    let mut buf = ZBuf::from(val);
+    let mut buf = ZBuf::from(val.to_vec());
     let timestamp = buf.read_timestamp().ok_or_else(|| {
         zerror2!(ZErrorKind::Other {
             descr: "Failed to decode data-info (timestamp)".to_string()
@@ -168,7 +168,7 @@ fn decode_encoding_timestamp_from_value(val: &[u8]) -> ZResult<(Encoding, Timest
 }
 
 fn decode_timestamp_from_value(val: &[u8]) -> ZResult<Timestamp> {
-    let mut buf = ZBuf::from(val);
+    let mut buf = ZBuf::from(val.to_vec());
     let timestamp = buf.read_timestamp().ok_or_else(|| {
         zerror2!(ZErrorKind::Other {
             descr: "Failed to decode data-info (timestamp)".to_string()
