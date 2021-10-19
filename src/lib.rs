@@ -83,14 +83,14 @@ impl Backend for FileSystemBackend {
     }
 
     async fn create_storage(&mut self, props: Properties) -> ZResult<Box<dyn Storage>> {
-        let path_expr = props.get(PROP_STORAGE_PATH_EXPR).unwrap();
+        let path_expr = props.get(PROP_STORAGE_KEY_EXPR).unwrap();
         let path_prefix = props
-            .get(PROP_STORAGE_PATH_PREFIX)
+            .get(PROP_STORAGE_KEY_PREFIX)
             .ok_or_else(|| {
                 zerror2!(ZErrorKind::Other {
                     descr: format!(
                         r#"Missing required property for File System Storage: "{}""#,
-                        PROP_STORAGE_PATH_PREFIX
+                        PROP_STORAGE_KEY_PREFIX
                     )
                 })
             })?
@@ -99,7 +99,7 @@ impl Backend for FileSystemBackend {
             return zerror!(ZErrorKind::Other {
                 descr: format!(
                     r#"The specified "{}={}" is not a prefix of "{}={}""#,
-                    PROP_STORAGE_PATH_PREFIX, path_prefix, PROP_STORAGE_PATH_EXPR, path_expr
+                    PROP_STORAGE_KEY_PREFIX, path_prefix, PROP_STORAGE_KEY_EXPR, path_expr
                 )
             });
         }
