@@ -16,6 +16,7 @@ use log::{debug, trace, warn};
 use std::borrow::Cow;
 use std::fmt;
 use std::fs::{metadata, remove_dir, remove_dir_all, remove_file, DirBuilder, File};
+// use std::ffi::OsString;
 use std::io::prelude::*;
 use std::iter::Iterator;
 use std::path::{Path, PathBuf};
@@ -29,12 +30,15 @@ use zenoh_util::{zerror, zerror2};
 
 use crate::data_info_mgt::*;
 
+pub const CONFLICT_SUFFIX: &str = "__z__";
+
 pub(crate) enum OnClosure {
     DeleteAll,
     DoNothing,
 }
 
 // a structure holding a zenoh path (absolute) and the corresponding file-system path (including the base_dir)
+#[derive(Debug)]
 pub(crate) struct ZFile<'a> {
     pub(crate) zpath: Cow<'a, str>,
     fspath: PathBuf,
@@ -181,7 +185,7 @@ impl FilesMgr {
     fn get_conflict_file(&self, file: PathBuf) -> PathBuf{
         match file.to_str(){
             Some(x) => 
-            PathBuf::from(format!("{}__z__", x)),
+            PathBuf::from(format!("{}{}", x, CONFLICT_SUFFIX)),
             None => file.to_path_buf(),
         }
     }
@@ -230,6 +234,13 @@ impl FilesMgr {
     // Otherwise, the encoding is guessed from the file extension, and the timestamp is computed from the file's time.
     pub(crate) async fn read_file(&self, zfile: &ZFile<'_>) -> ZResult<Option<(Value, Timestamp)>> {
         let file = &zfile.fspath;
+        //TODO: what if the query comes for the filename with CONFLICT_SUFFIX??
+        // let trimmed_file = if file.file_name().unwrap_or(&OsString::new()).to_os_string().to_str().unwrap_or("").ends_with(CONFLICT_SUFFIX) {
+        //     Path::new(file.to_str().unwrap_or("").strip_suffix(CONFLICT_SUFFIX).unwrap_or(""))
+        // } else {
+        //     file
+        // };
+        // debug!{"The trimmed file name is {:?}", trimmed_file};
         match self.perform_read(file.to_path_buf()).await? {
             Some(x) => Ok(Some(x)),
             None => self.perform_read_from_conflict(file.to_path_buf()).await,
@@ -452,11 +463,16 @@ impl<'a> Iterator for FilesIterator<'a> {
                         let fspath = e.into_path();
                         if let Some(s) = fspath.to_str() {
                             // zpath is the file's absolute path stripped from base_dir and converted as zenoh path
+                            let coarse_zpath =
+                            fspath_to_zpath(&s[self.base_dir_len..]);
                             // note: force owning to not have fspath borrowed
-                            let zpath =
-                                Cow::from(fspath_to_zpath(&s[self.base_dir_len..]).into_owned());
+                            let zpath = Cow::from(if coarse_zpath.ends_with(CONFLICT_SUFFIX) {
+                                coarse_zpath.strip_suffix(CONFLICT_SUFFIX).unwrap_or(coarse_zpath.as_ref())
+                            } else{
+                                coarse_zpath.as_ref()
+                            }.to_owned());
                             // convert it to zenoh path for matching test with zpath_expr
-                            if rname::intersect(zpath.as_ref(), self.zpath_expr) {
+                            if rname::intersect(&zpath, self.zpath_expr) {
                                 // matching file; return a ZFile
                                 let zfile = ZFile {
                                     zpath,

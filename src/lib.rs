@@ -248,7 +248,15 @@ struct FileSystemStorage {
 impl FileSystemStorage {
     async fn reply_with_matching_files(&self, query: &Query, path_expr: &str) {
         for zfile in self.files_mgr.matching_files(path_expr) {
-            self.reply_with_file(query, &zfile).await;
+            debug!{"filenema hereeeeee {:?}", zfile};
+            let trimmed_zpath = if zfile.zpath.ends_with(CONFLICT_SUFFIX) {
+                zfile.zpath.strip_suffix(CONFLICT_SUFFIX).unwrap_or(zfile.zpath.as_ref())
+            } else{
+                zfile.zpath.as_ref()
+            };
+            debug!("trimmed zpath hereeeeee {:?}", trimmed_zpath);
+            let trimmed_zfile = self.files_mgr.to_zfile(trimmed_zpath);
+            self.reply_with_file(query, &trimmed_zfile).await;
         }
     }
 
