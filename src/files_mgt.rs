@@ -184,8 +184,7 @@ impl FilesMgr {
 
     fn get_conflict_file(&self, file: PathBuf) -> PathBuf{
         match file.to_str(){
-            Some(x) => 
-            PathBuf::from(format!("{}{}", x, CONFLICT_SUFFIX)),
+            Some(x) => PathBuf::from(get_conflict_resolved_keyexpr(x)),
             None => file.to_path_buf(),
         }
     }
@@ -235,12 +234,6 @@ impl FilesMgr {
     pub(crate) async fn read_file(&self, zfile: &ZFile<'_>) -> ZResult<Option<(Value, Timestamp)>> {
         let file = &zfile.fspath;
         //TODO: what if the query comes for the filename with CONFLICT_SUFFIX??
-        // let trimmed_file = if file.file_name().unwrap_or(&OsString::new()).to_os_string().to_str().unwrap_or("").ends_with(CONFLICT_SUFFIX) {
-        //     Path::new(file.to_str().unwrap_or("").strip_suffix(CONFLICT_SUFFIX).unwrap_or(""))
-        // } else {
-        //     file
-        // };
-        // debug!{"The trimmed file name is {:?}", trimmed_file};
         match self.perform_read(file.to_path_buf()).await? {
             Some(x) => Ok(Some(x)),
             None => self.perform_read_from_conflict(file.to_path_buf()).await,
@@ -466,11 +459,7 @@ impl<'a> Iterator for FilesIterator<'a> {
                             let coarse_zpath =
                             fspath_to_zpath(&s[self.base_dir_len..]);
                             // note: force owning to not have fspath borrowed
-                            let zpath = Cow::from(if coarse_zpath.ends_with(CONFLICT_SUFFIX) {
-                                coarse_zpath.strip_suffix(CONFLICT_SUFFIX).unwrap_or(coarse_zpath.as_ref())
-                            } else{
-                                coarse_zpath.as_ref()
-                            }.to_owned());
+                            let zpath = Cow::from(get_trimmed_keyexpr(&coarse_zpath));
                             // convert it to zenoh path for matching test with zpath_expr
                             if rname::intersect(&zpath, self.zpath_expr) {
                                 // matching file; return a ZFile
@@ -532,4 +521,16 @@ fn is_symlink<P: AsRef<Path>>(path: P) -> bool {
         Ok(metadata) => metadata.file_type().is_symlink(),
         Err(_) => false,
     }
+}
+
+pub(crate) fn get_trimmed_keyexpr(keyexpr: &str) -> String {
+    if keyexpr.ends_with(CONFLICT_SUFFIX) {
+        keyexpr.strip_suffix(CONFLICT_SUFFIX).unwrap_or(keyexpr.as_ref()).to_string()
+    } else{
+        keyexpr.to_string()
+    }
+}
+
+pub(crate) fn get_conflict_resolved_keyexpr(keyexpr: &str) -> String {
+    format!("{}{}", keyexpr, CONFLICT_SUFFIX)
 }
