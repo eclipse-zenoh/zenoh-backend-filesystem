@@ -117,7 +117,7 @@ impl FilesMgr {
                 trace!("Conflict detected for {:?}", a);
                 let conflict_file = self.get_conflict_file(a.to_path_buf());
                 trace!("Writing to conflict free file {:?}", conflict_file);
-                //TODO: move everything related to this file to the conflict file, including rocksdb entry if present
+                //move everything related to this file to the conflict file, including rocksdb entry if present
                 let mut cf = File::create(&conflict_file).map_err(|e| {
                     zerror2!(ZErrorKind::Other {
                         descr: format!("Failed to write in file {:?}: {}", conflict_file, e)
@@ -136,7 +136,7 @@ impl FilesMgr {
                     })?;
                 }
                 let (conflict_encoding, conflict_timestamp) = self.get_encoding_and_timestamp(a.to_path_buf()).await?;
-                // save data-info
+                // save data-info of conflictfile
                 self.data_info_mgr
                     .put_data_info(conflict_file, &conflict_encoding, &conflict_timestamp)
                     .await?;
@@ -149,11 +149,11 @@ impl FilesMgr {
             }
         }
 
-            self.dir_builder.create(parent).map_err(|e| {
-                zerror2!(ZErrorKind::Other {
-                    descr: format!("Failed to create directories for file {:?}: {}", file, e)
-                })
-            })?;
+        self.dir_builder.create(parent).map_err(|e| {
+            zerror2!(ZErrorKind::Other {
+                descr: format!("Failed to create directories for file {:?}: {}", file, e)
+            })
+        })?;
 
         // Write file
         trace!("Write in file {:?}", file);
@@ -233,7 +233,7 @@ impl FilesMgr {
     // Otherwise, the encoding is guessed from the file extension, and the timestamp is computed from the file's time.
     pub(crate) async fn read_file(&self, zfile: &ZFile<'_>) -> ZResult<Option<(Value, Timestamp)>> {
         let file = &zfile.fspath;
-        //TODO: what if the query comes for the filename with CONFLICT_SUFFIX??
+        //TODO: what if the query comes for the filename atually with CONFLICT_SUFFIX??
         match self.perform_read(file.to_path_buf()).await? {
             Some(x) => Ok(Some(x)),
             None => self.perform_read_from_conflict(file.to_path_buf()).await,
@@ -455,10 +455,9 @@ impl<'a> Iterator for FilesIterator<'a> {
                     } else {
                         let fspath = e.into_path();
                         if let Some(s) = fspath.to_str() {
-                            // zpath is the file's absolute path stripped from base_dir and converted as zenoh path
-                            let coarse_zpath =
-                            fspath_to_zpath(&s[self.base_dir_len..]);
-                            // note: force owning to not have fspath borrowed
+                            // coarse_zpath is the file's absolute path stripped from base_dir and converted as zenoh path
+                            let coarse_zpath = fspath_to_zpath(&s[self.base_dir_len..]);
+                            // zpath trims away the CONFLICT_SUFFIX if present
                             let zpath = Cow::from(get_trimmed_keyexpr(&coarse_zpath));
                             // convert it to zenoh path for matching test with zpath_expr
                             if rname::intersect(&zpath, self.zpath_expr) {
