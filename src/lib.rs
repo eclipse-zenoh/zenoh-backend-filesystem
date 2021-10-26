@@ -248,9 +248,7 @@ struct FileSystemStorage {
 impl FileSystemStorage {
     async fn reply_with_matching_files(&self, query: &Query, path_expr: &str) {
         for zfile in self.files_mgr.matching_files(path_expr) {
-            debug!{"filenema hereeeeee {:?}", zfile};
             let trimmed_zpath = get_trimmed_keyexpr(zfile.zpath.as_ref());
-            debug!("trimmed zpath hereeeeee {:?}", trimmed_zpath);
             let trimmed_zfile = self.files_mgr.to_zfile(&trimmed_zpath);
             self.reply_with_file(query, &trimmed_zfile).await;
         }
@@ -287,11 +285,6 @@ impl Storage for FileSystemStorage {
         self.admin_status.clone()
     }
 
-
-    // ### Behaviour in case of conflict
-    // A possible case of conflict occurs when a PUT operation operates on a prefix of another PUT.
-    // This leads to having a directory and file with the same name which is forbidden on file systems.
-    // We fix this by appending a suffix `__z__` to the conflicting file. This is dealt with internally and not exposed to the user.
 
     // When receiving a Sample (i.e. on PUT or DELETE operations)
     async fn on_sample(&mut self, sample: Sample) -> ZResult<()> {

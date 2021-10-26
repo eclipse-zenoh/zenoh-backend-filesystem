@@ -15,8 +15,7 @@ use async_std::task;
 use log::{debug, trace, warn};
 use std::borrow::Cow;
 use std::fmt;
-use std::fs::{metadata, remove_dir, remove_dir_all, remove_file, DirBuilder, File};
-// use std::ffi::OsString;
+use std::fs::{metadata, remove_dir, remove_dir_all, remove_file, rename, DirBuilder, File};
 use std::io::prelude::*;
 use std::iter::Iterator;
 use std::path::{Path, PathBuf};
@@ -30,7 +29,7 @@ use zenoh_util::{zerror, zerror2};
 
 use crate::data_info_mgt::*;
 
-pub const CONFLICT_SUFFIX: &str = "__z__";
+pub const CONFLICT_SUFFIX: &str = ".##z";
 
 pub(crate) enum OnClosure {
     DeleteAll,
@@ -98,6 +97,11 @@ impl FilesMgr {
         PathBuf::from(os_str)
     }
 
+    // ### Behaviour in case of conflict
+    // A possible case of conflict occurs when a PUT operation operates on a prefix of another PUT.
+    // This leads to having a directory and file with the same name which is forbidden on file systems.
+    // We fix this by appending a suffix `.##z` to the conflicting file. This is dealt with internally and not exposed to the user.
+
     pub(crate) async fn write_file(
         &self,
         zfile: &ZFile<'_>,
@@ -109,45 +113,32 @@ impl FilesMgr {
 
         // Create parent directories if needed
         let parent = file.parent().unwrap();
-        let mut ancestor = parent.ancestors().collect::<Vec<_>>();
-        ancestor.reverse();
+        let ancestor = parent.ancestors().collect::<Vec<_>>();
         for a in ancestor {
-            trace!("checking ancestor {:?}", a);
+            // if the ancestor is a directory, break, no need to check anything else
+            if a.exists() && a.is_dir(){
+                break;
+            }
+            // if the ancestor is a file, rename the file with a conflict suffix and update the info on rocksdb
             if a.exists() && a.is_file(){
-                trace!("Conflict detected for {:?}", a);
                 let conflict_file = self.get_conflict_file(a.to_path_buf());
-                trace!("Writing to conflict free file {:?}", conflict_file);
-                //move everything related to this file to the conflict file, including rocksdb entry if present
-                let mut cf = File::create(&conflict_file).map_err(|e| {
+                trace!("Conflict detected for {:?}. Writing to conflict free file {:?}", a, conflict_file);
+                rename(a, conflict_file.to_path_buf()).map_err(|e| {
                     zerror2!(ZErrorKind::Other {
                         descr: format!("Failed to write in file {:?}: {}", conflict_file, e)
                     })
                 })?;
-                let conflict_value = match self.perform_read(a.to_path_buf()).await? {
-                    Some(val) => val.0,
-                    None => Vec::new().into(),
+                match self.data_info_mgr.rename_key(a, &conflict_file).await {
+                    Ok(_) => None,
+                    Err(_) => {
+                        // fallback: get encoding and timestamp from file's metadata
+                        let (a_encoding, a_timestamp) = self.generate_metadata(&a.to_path_buf(), &timestamp);
+                        self.data_info_mgr.put_data_info(file, &a_encoding, &a_timestamp).await.ok()
+                    }
                 };
-                let conflict_content = conflict_value.payload;
-                for slice in conflict_content {
-                    cf.write_all(slice.as_slice()).map_err(|e| {
-                        zerror2!(ZErrorKind::Other {
-                            descr: format!("Failed to write in file {:?}: {}", conflict_file, e)
-                        })
-                    })?;
-                }
-                let (conflict_encoding, conflict_timestamp) = self.get_encoding_and_timestamp(a.to_path_buf()).await?;
-                // save data-info of conflictfile
-                self.data_info_mgr
-                    .put_data_info(conflict_file, &conflict_encoding, &conflict_timestamp)
-                    .await?;
-                // cleanup the previous file
-                remove_file(a.to_path_buf()).map_err(|e| {
-                    zerror2!(ZErrorKind::Other {
-                        descr: format!("Failed to delete file {:?}: {}", a, e)
-                    })
-                })?;
             }
         }
+
 
         self.dir_builder.create(parent).map_err(|e| {
             zerror2!(ZErrorKind::Other {
@@ -233,8 +224,7 @@ impl FilesMgr {
     // Otherwise, the encoding is guessed from the file extension, and the timestamp is computed from the file's time.
     pub(crate) async fn read_file(&self, zfile: &ZFile<'_>) -> ZResult<Option<(Value, Timestamp)>> {
         let file = &zfile.fspath;
-        //TODO: what if the query comes for the filename atually with CONFLICT_SUFFIX??
-        match self.perform_read(file.to_path_buf()).await? {
+        match self.perform_read(&file.to_path_buf()).await? {
             Some(x) => Ok(Some(x)),
             None => self.perform_read_from_conflict(file.to_path_buf()).await,
         }
@@ -242,10 +232,10 @@ impl FilesMgr {
 
     async fn perform_read_from_conflict(&self, file:PathBuf) -> ZResult<Option<(Value, Timestamp)>> {
         let file = self.get_conflict_file(file.to_path_buf()); 
-        self.perform_read(file.to_path_buf()).await
+        self.perform_read(&file.to_path_buf()).await
     }
 
-    async fn perform_read(&self, file:PathBuf) -> ZResult<Option<(Value, Timestamp)>> {
+    async fn perform_read(&self, file:&PathBuf) -> ZResult<Option<(Value, Timestamp)>> {
         // consider file only is it exists, it's a file and in case of "follow_links=true" it doesn't contain symlink
         if file.exists() && file.is_file() && (self.follow_links || !self.contains_symlink(&file)) {
             match File::open(&file) {
@@ -261,7 +251,7 @@ impl FilesMgr {
                             })
                         } else {
                             let (encoding, timestamp) =
-                                self.get_encoding_and_timestamp(file.to_path_buf()).await?;
+                                self.get_encoding_and_timestamp(&file.to_path_buf()).await?;
                             Ok(Some((
                                 Value {
                                     payload: content.into(),
@@ -326,28 +316,40 @@ impl FilesMgr {
         }
     }
 
+    fn generate_metadata(&self, file:&PathBuf, timestamp: &Timestamp) -> (Encoding, Timestamp){
+        let a_encoding = self.guess_encoding(&file);
+        let a_timestamp = match self.get_timestamp_from_metadata(file){
+            Ok(a_ts) => a_ts,
+            Err(_) => timestamp.clone(),
+        };
+        (a_encoding, a_timestamp)
+    }
+
     async fn get_encoding_and_timestamp(
         &self,
-        file: PathBuf,
+        file: &PathBuf,
     ) -> ZResult<(Encoding, Timestamp)> {
         // try to get Encoding and Timestamp from data_info_mgr
         match self.data_info_mgr.get_encoding_and_timestamp(&file).await? {
             Some((encoding, timestamp)) => Ok((encoding, timestamp)),
             None => {
                 trace!("data-info for {:?} not found; fallback to metadata", file);
-                let encoding = if self.keep_mime {
-                    // fallback: guess mime type from file extension
-                    let mime_type = mime_guess::from_path(&file).first_or_octet_stream();
-                    Encoding::from(mime_type.essence_str().to_string())
-                } else {
-                    Encoding::APP_OCTET_STREAM
-                };
-
+                let encoding = self.guess_encoding(&file);
                 // fallback: get timestamp from file's metadata
                 let timestamp = self.get_timestamp_from_metadata(file)?;
 
                 Ok((encoding, timestamp))
             }
+        }
+    }
+
+    fn guess_encoding(&self, file: &PathBuf) -> Encoding{
+        if self.keep_mime {
+            // fallback: guess mime type from file extension
+            let mime_type = mime_guess::from_path(&file).first_or_octet_stream();
+            Encoding::from(mime_type.essence_str().to_string())
+        } else {
+            Encoding::APP_OCTET_STREAM
         }
     }
 

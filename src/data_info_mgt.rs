@@ -104,6 +104,41 @@ impl DataInfoMgr {
         }
     }
 
+    pub(crate) async fn rename_key<P: AsRef<Path>>(
+        &self,
+        from: P,
+        to: P
+    ) -> ZResult<()>{
+        let from_key = from.as_ref().to_string_lossy();
+        let to_key = to.as_ref().to_string_lossy();
+        trace!("Changing data-info from {} to {}", from_key, to_key);
+        let db_instance = self.db.lock().await;
+        let val = db_instance.get_pinned(from_key.as_bytes());
+        match val {
+            Ok(Some(pin_val)) => {
+                db_instance.put(to_key.as_bytes(), pin_val).map_err(|e| {
+                    zerror2!(ZErrorKind::Other {
+                        descr: format!("Failed to save data-info for {:?}: {}", to.as_ref(), e)
+                    })
+                })?;
+                db_instance.delete(from_key.as_bytes()).map_err(|e| {
+                    zerror2!(ZErrorKind::Other {
+                        descr: format!("Failed to save data-info for {:?}: {}", to.as_ref(), e)
+                    })
+                })
+            },
+            Ok(None) => {
+                trace!("data-info for {:?} not found", from.as_ref());
+                zerror!(ZErrorKind::Other {
+                    descr: format!("Failed to get data-info for {:?}: data-info not found", from.as_ref())
+                })
+            },
+            Err(e) => zerror!(ZErrorKind::Other {
+                descr: format!("Failed to get data-info for {:?}: {}", from.as_ref(), e)
+            }),
+        }
+    }
+
     pub(crate) async fn get_encoding_and_timestamp<P: AsRef<Path>>(
         &self,
         file: P,
