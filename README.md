@@ -96,12 +96,12 @@ Each **storage** will map to a directory with path: `${ZBACKEND_FS_ROOT}/<dir>`,
      (where the default value of `${ZENOH_HOME}` is `~/.zenoh`).
   * `<dir>` is the `"dir"` property specified at storage creation.
 Each zenoh **key/value** put into the storage will map to a file within the storage's directory where:
-  * the file path will be `${ZBACKEND_FS_ROOT}/<dir>/<relative_zenoh_key>`, where `<relative_zenoh_key>``
+  * the file path will be `${ZBACKEND_FS_ROOT}/<dir>/<relative_zenoh_key>`, where `<relative_zenoh_key>`
     will be the zenoh key, stripped from the `"key_prefix"` property specified at storage creation.
   * the content of the file will be the value written as a RawValue. I.e. the same bytes buffer that has been
     transported by zenoh. For UTF-8 compatible formats (StringUTF8, JSon, Integer, Float...) it means the file
     will be readable as a text format.
- * the encoding and the timestamp of the key/value will be stored in a RocksDB database stored in the storage directory.
+  * the encoding and the timestamp of the key/value will be stored in a RocksDB database stored in the storage directory.
 
 ### Behaviour on deletion
 On deletion of a key, the corresponding file is removed. An entry with deletion timestamp is inserted in the
