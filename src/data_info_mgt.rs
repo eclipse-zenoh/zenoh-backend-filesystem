@@ -104,11 +104,7 @@ impl DataInfoMgr {
         }
     }
 
-    pub(crate) async fn rename_key<P: AsRef<Path>>(
-        &self,
-        from: P,
-        to: P
-    ) -> ZResult<()>{
+    pub(crate) async fn rename_key<P: AsRef<Path>>(&self, from: P, to: P) -> ZResult<()> {
         let from_key = from.as_ref().to_string_lossy();
         let to_key = to.as_ref().to_string_lossy();
         trace!("Changing data-info from {} to {}", from_key, to_key);
@@ -126,13 +122,16 @@ impl DataInfoMgr {
                         descr: format!("Failed to save data-info for {:?}: {}", to.as_ref(), e)
                     })
                 })
-            },
+            }
             Ok(None) => {
                 trace!("data-info for {:?} not found", from.as_ref());
                 zerror!(ZErrorKind::Other {
-                    descr: format!("Failed to get data-info for {:?}: data-info not found", from.as_ref())
+                    descr: format!(
+                        "Failed to get data-info for {:?}: data-info not found",
+                        from.as_ref()
+                    )
                 })
-            },
+            }
             Err(e) => zerror!(ZErrorKind::Other {
                 descr: format!("Failed to get data-info for {:?}: {}", from.as_ref(), e)
             }),

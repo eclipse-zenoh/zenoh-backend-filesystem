@@ -116,13 +116,17 @@ impl FilesMgr {
         let ancestor = parent.ancestors().collect::<Vec<_>>();
         for a in ancestor {
             // if the ancestor is a directory, break, no need to check anything else
-            if a.exists() && a.is_dir(){
+            if a.exists() && a.is_dir() {
                 break;
             }
             // if the ancestor is a file, rename the file with a conflict suffix and update the info on rocksdb
-            if a.exists() && a.is_file(){
+            if a.exists() && a.is_file() {
                 let conflict_file = self.get_conflict_file(a.to_path_buf());
-                trace!("Conflict detected for {:?}. Writing to conflict free file {:?}", a, conflict_file);
+                trace!(
+                    "Conflict detected for {:?}. Writing to conflict free file {:?}",
+                    a,
+                    conflict_file
+                );
                 rename(a, conflict_file.to_path_buf()).map_err(|e| {
                     zerror2!(ZErrorKind::Other {
                         descr: format!("Failed to write in file {:?}: {}", conflict_file, e)
@@ -132,13 +136,16 @@ impl FilesMgr {
                     Ok(_) => None,
                     Err(_) => {
                         // fallback: get encoding and timestamp from file's metadata
-                        let (a_encoding, a_timestamp) = self.generate_metadata(&a.to_path_buf(), &timestamp);
-                        self.data_info_mgr.put_data_info(file, &a_encoding, &a_timestamp).await.ok()
+                        let (a_encoding, a_timestamp) =
+                            self.generate_metadata(&a.to_path_buf(), &timestamp);
+                        self.data_info_mgr
+                            .put_data_info(file, &a_encoding, &a_timestamp)
+                            .await
+                            .ok()
                     }
                 };
             }
         }
-
 
         self.dir_builder.create(parent).map_err(|e| {
             zerror2!(ZErrorKind::Other {
@@ -150,7 +157,7 @@ impl FilesMgr {
         trace!("Write in file {:?}", file);
         let file = if file.exists() && file.is_dir() {
             self.get_conflict_file(file.to_path_buf())
-        } else{
+        } else {
             file.to_path_buf()
         };
         trace!("Writing in conflict-free file {:?}", file);
@@ -173,8 +180,8 @@ impl FilesMgr {
             .await
     }
 
-    fn get_conflict_file(&self, file: PathBuf) -> PathBuf{
-        match file.to_str(){
+    fn get_conflict_file(&self, file: PathBuf) -> PathBuf {
+        match file.to_str() {
             Some(x) => PathBuf::from(get_conflict_resolved_keyexpr(x)),
             None => file.to_path_buf(),
         }
@@ -230,12 +237,15 @@ impl FilesMgr {
         }
     }
 
-    async fn perform_read_from_conflict(&self, file:PathBuf) -> ZResult<Option<(Value, Timestamp)>> {
-        let file = self.get_conflict_file(file.to_path_buf()); 
+    async fn perform_read_from_conflict(
+        &self,
+        file: PathBuf,
+    ) -> ZResult<Option<(Value, Timestamp)>> {
+        let file = self.get_conflict_file(file.to_path_buf());
         self.perform_read(&file.to_path_buf()).await
     }
 
-    async fn perform_read(&self, file:&PathBuf) -> ZResult<Option<(Value, Timestamp)>> {
+    async fn perform_read(&self, file: &PathBuf) -> ZResult<Option<(Value, Timestamp)>> {
         // consider file only is it exists, it's a file and in case of "follow_links=true" it doesn't contain symlink
         if file.exists() && file.is_file() && (self.follow_links || !self.contains_symlink(&file)) {
             match File::open(&file) {
@@ -316,19 +326,16 @@ impl FilesMgr {
         }
     }
 
-    fn generate_metadata(&self, file:&PathBuf, timestamp: &Timestamp) -> (Encoding, Timestamp){
+    fn generate_metadata(&self, file: &PathBuf, timestamp: &Timestamp) -> (Encoding, Timestamp) {
         let a_encoding = self.guess_encoding(&file);
-        let a_timestamp = match self.get_timestamp_from_metadata(file){
+        let a_timestamp = match self.get_timestamp_from_metadata(file) {
             Ok(a_ts) => a_ts,
             Err(_) => timestamp.clone(),
         };
         (a_encoding, a_timestamp)
     }
 
-    async fn get_encoding_and_timestamp(
-        &self,
-        file: &PathBuf,
-    ) -> ZResult<(Encoding, Timestamp)> {
+    async fn get_encoding_and_timestamp(&self, file: &PathBuf) -> ZResult<(Encoding, Timestamp)> {
         // try to get Encoding and Timestamp from data_info_mgr
         match self.data_info_mgr.get_encoding_and_timestamp(&file).await? {
             Some((encoding, timestamp)) => Ok((encoding, timestamp)),
@@ -343,7 +350,7 @@ impl FilesMgr {
         }
     }
 
-    fn guess_encoding(&self, file: &PathBuf) -> Encoding{
+    fn guess_encoding(&self, file: &PathBuf) -> Encoding {
         if self.keep_mime {
             // fallback: guess mime type from file extension
             let mime_type = mime_guess::from_path(&file).first_or_octet_stream();
@@ -526,8 +533,11 @@ fn is_symlink<P: AsRef<Path>>(path: P) -> bool {
 
 pub(crate) fn get_trimmed_keyexpr(keyexpr: &str) -> String {
     if keyexpr.ends_with(CONFLICT_SUFFIX) {
-        keyexpr.strip_suffix(CONFLICT_SUFFIX).unwrap_or(keyexpr.as_ref()).to_string()
-    } else{
+        keyexpr
+            .strip_suffix(CONFLICT_SUFFIX)
+            .unwrap_or(keyexpr.as_ref())
+            .to_string()
+    } else {
         keyexpr.to_string()
     }
 }

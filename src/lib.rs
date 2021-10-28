@@ -285,7 +285,6 @@ impl Storage for FileSystemStorage {
         self.admin_status.clone()
     }
 
-
     // When receiving a Sample (i.e. on PUT or DELETE operations)
     async fn on_sample(&mut self, sample: Sample) -> ZResult<()> {
         // strip path from "path_prefix" and converted to a ZFile
