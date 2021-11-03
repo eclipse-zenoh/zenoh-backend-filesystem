@@ -137,7 +137,7 @@ impl FilesMgr {
                     Err(_) => {
                         // fallback: get encoding and timestamp from file's metadata
                         let (a_encoding, a_timestamp) =
-                            self.generate_metadata(&a.to_path_buf(), &timestamp);
+                            self.generate_metadata(&a.to_path_buf(), timestamp);
                         self.data_info_mgr
                             .put_data_info(file, &a_encoding, &a_timestamp)
                             .await
@@ -245,7 +245,7 @@ impl FilesMgr {
         self.perform_read(&file.to_path_buf()).await
     }
 
-    async fn perform_read(&self, file: &PathBuf) -> ZResult<Option<(Value, Timestamp)>> {
+    async fn perform_read(&self, file: &Path) -> ZResult<Option<(Value, Timestamp)>> {
         // consider file only is it exists, it's a file and in case of "follow_links=true" it doesn't contain symlink
         if file.exists() && file.is_file() && (self.follow_links || !self.contains_symlink(&file)) {
             match File::open(&file) {
@@ -326,22 +326,22 @@ impl FilesMgr {
         }
     }
 
-    fn generate_metadata(&self, file: &PathBuf, timestamp: &Timestamp) -> (Encoding, Timestamp) {
-        let a_encoding = self.guess_encoding(&file);
+    fn generate_metadata(&self, file: &Path, timestamp: &Timestamp) -> (Encoding, Timestamp) {
+        let a_encoding = self.guess_encoding(file);
         let a_timestamp = match self.get_timestamp_from_metadata(file) {
             Ok(a_ts) => a_ts,
-            Err(_) => timestamp.clone(),
+            Err(_) => *timestamp,
         };
         (a_encoding, a_timestamp)
     }
 
-    async fn get_encoding_and_timestamp(&self, file: &PathBuf) -> ZResult<(Encoding, Timestamp)> {
+    async fn get_encoding_and_timestamp(&self, file: &Path) -> ZResult<(Encoding, Timestamp)> {
         // try to get Encoding and Timestamp from data_info_mgr
         match self.data_info_mgr.get_encoding_and_timestamp(&file).await? {
             Some((encoding, timestamp)) => Ok((encoding, timestamp)),
             None => {
                 trace!("data-info for {:?} not found; fallback to metadata", file);
-                let encoding = self.guess_encoding(&file);
+                let encoding = self.guess_encoding(file);
                 // fallback: get timestamp from file's metadata
                 let timestamp = self.get_timestamp_from_metadata(file)?;
 
@@ -350,7 +350,7 @@ impl FilesMgr {
         }
     }
 
-    fn guess_encoding(&self, file: &PathBuf) -> Encoding {
+    fn guess_encoding(&self, file: &Path) -> Encoding {
         if self.keep_mime {
             // fallback: guess mime type from file extension
             let mime_type = mime_guess::from_path(&file).first_or_octet_stream();
@@ -535,7 +535,7 @@ pub(crate) fn get_trimmed_keyexpr(keyexpr: &str) -> String {
     if keyexpr.ends_with(CONFLICT_SUFFIX) {
         keyexpr
             .strip_suffix(CONFLICT_SUFFIX)
-            .unwrap_or(keyexpr.as_ref())
+            .unwrap_or(keyexpr)
             .to_string()
     } else {
         keyexpr.to_string()
