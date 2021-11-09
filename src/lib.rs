@@ -54,7 +54,7 @@ lazy_static::lazy_static!(
 const CREATE_BACKEND_TYPECHECK: CreateBackend = create_backend;
 
 #[no_mangle]
-pub extern "C" fn create_backend(_unused: BackendConfig) -> ZResult<Box<dyn Backend>> {
+pub fn create_backend(_unused: BackendConfig) -> ZResult<Box<dyn Backend>> {
     // For some reasons env_logger is sometime not active in a loaded library.
     // Try to activate it here, ignoring failures.
     let _ = env_logger::try_init();
