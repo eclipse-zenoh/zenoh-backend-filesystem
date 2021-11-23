@@ -264,7 +264,8 @@ impl Storage for FileSystemStorage {
     async fn on_sample(&mut self, sample: Sample) -> ZResult<()> {
         // strip path from "path_prefix" and converted to a ZFile
         let zfile = sample
-            .res_name
+            .key_expr
+            .try_as_str()?
             .strip_prefix(&self.path_prefix)
             .map(|p| self.files_mgr.to_zfile(p))
             .ok_or_else(|| {
@@ -283,7 +284,7 @@ impl Storage for FileSystemStorage {
             if sample_ts < old_ts {
                 debug!(
                     "{} on {} dropped: out-of-date",
-                    sample.kind, sample.res_name
+                    sample.kind, sample.key_expr
                 );
                 return Ok(());
             }
@@ -323,7 +324,7 @@ impl Storage for FileSystemStorage {
                 }
             }
             SampleKind::Patch => {
-                warn!("Received PATCH for {}: not yet supported", sample.res_name);
+                warn!("Received PATCH for {}: not yet supported", sample.key_expr);
                 Ok(())
             }
         }
@@ -336,7 +337,8 @@ impl Storage for FileSystemStorage {
 
         // get the list of sub-path expressions that will match the same stored keys than
         // the selector, if those keys had the path_prefix.
-        let sub_selectors = utils::get_sub_key_selectors(selector.key_selector, &self.path_prefix);
+        let sub_selectors =
+            utils::get_sub_key_selectors(selector.key_selector.try_as_str()?, &self.path_prefix);
         debug!(
             "Query on {} with path_prefix={} => sub_selectors = {:?}",
             selector.key_selector, self.path_prefix, sub_selectors

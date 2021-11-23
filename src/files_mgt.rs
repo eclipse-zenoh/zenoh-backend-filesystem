@@ -22,9 +22,9 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use walkdir::{IntoIter, WalkDir};
 use zenoh::buf::ZBuf;
-use zenoh::net::protocol::core::rname;
 use zenoh::prelude::*;
 use zenoh::time::{Timestamp, TimestampId};
+use zenoh::utils::key_expr;
 use zenoh_util::{zerror, zerror2};
 
 use crate::data_info_mgt::*;
@@ -469,7 +469,7 @@ impl<'a> Iterator for FilesIterator<'a> {
                             // zpath trims away the CONFLICT_SUFFIX if present
                             let zpath = Cow::from(get_trimmed_keyexpr(&coarse_zpath));
                             // convert it to zenoh path for matching test with zpath_expr
-                            if rname::intersect(&zpath, self.zpath_expr) {
+                            if key_expr::intersect(&zpath, self.zpath_expr) {
                                 // matching file; return a ZFile
                                 let zfile = ZFile {
                                     zpath,
