@@ -18,11 +18,12 @@ use std::io::prelude::*;
 use std::path::PathBuf;
 use std::{fs::DirBuilder, sync::Arc};
 use tempfile::tempfile_in;
+use zenoh::Result as ZResult;
 use zenoh::{prelude::*, time::new_reception_timestamp};
 use zenoh_backend_traits::{
     config::BackendConfig, config::StorageConfig, utils, Backend, CreateBackend, Query, Storage,
 };
-use zenoh_util::{zenoh_home, zerror, zerror2};
+use zenoh_util::{bail, zenoh_home, zerror};
 
 mod data_info_mgt;
 mod files_mgt;
@@ -90,12 +91,10 @@ fn extract_bool(
     match from.get(key) {
         Some(serde_json::Value::Bool(s)) => Ok(*s),
         None => Ok(default),
-        _ => zerror!(ZErrorKind::Other {
-            descr: format!(
-                r#"Invalid value for File System Storage configuration: `{}` must be a boolean"#,
-                key
-            )
-        }),
+        _ => bail!(
+            r#"Invalid value for File System Storage configuration: `{}` must be a boolean"#,
+            key
+        ),
     }
 }
 
@@ -109,12 +108,11 @@ impl Backend for FileSystemBackend {
         let path_expr = config.key_expr.clone();
         let path_prefix = config.truncate.clone();
         if !path_expr.starts_with(&path_prefix) {
-            return zerror!(ZErrorKind::Other {
-                descr: format!(
-                    r#"The specified "truncate={}" is not a prefix of "key_expr={}""#,
-                    path_prefix, path_expr
-                )
-            });
+            bail!(
+                r#"The specified "truncate={}" is not a prefix of "key_expr={}""#,
+                path_prefix,
+                path_expr
+            )
         }
 
         let read_only = extract_bool(&config.rest, PROP_STORAGE_READ_ONLY, false)?;
@@ -125,12 +123,10 @@ impl Backend for FileSystemBackend {
             Some(serde_json::Value::String(s)) if s == "do_nothing" => OnClosure::DoNothing,
             None => OnClosure::DoNothing,
             Some(s) => {
-                return zerror!(ZErrorKind::Other {
-                    descr: format!(
-                        r#"Unsupported value {:?} for `on_closure` property: must be either "delete_all" or "do_nothing". Default is "do_nothing""#,
-                        s
-                    )
-                });
+                bail!(
+                    r#"Unsupported value {:?} for `on_closure` property: must be either "delete_all" or "do_nothing". Default is "do_nothing""#,
+                    s
+                )
             }
         };
 
@@ -141,12 +137,10 @@ impl Backend for FileSystemBackend {
                 base_dir.push(dir);
                 base_dir
             } else {
-                return zerror!(ZErrorKind::Other {
-                    descr: format!(
-                        r#"Missing required property for File System Storage: "{}""#,
-                        PROP_STORAGE_DIR
-                    )
-                });
+                bail!(
+                    r#"Missing required property for File System Storage: "{}""#,
+                    PROP_STORAGE_DIR
+                )
             };
 
         // check if base_dir exists and is readable (and writeable if not "read_only" mode)
@@ -155,38 +149,33 @@ impl Backend for FileSystemBackend {
         let base_dir_path = PathBuf::from(&base_dir);
         if !base_dir_path.exists() {
             if let Err(err) = dir_builder.create(&base_dir) {
-                return zerror!(ZErrorKind::Other {
-                    descr: format!(
-                        r#"Cannot create File System Storage on "dir"={:?} : {}"#,
-                        base_dir, err
-                    )
-                });
+                bail!(
+                    r#"Cannot create File System Storage on "dir"={:?} : {}"#,
+                    base_dir,
+                    err
+                )
             }
         } else if !base_dir_path.is_dir() {
-            return zerror!(ZErrorKind::Other {
-                descr: format!(
-                    r#"Cannot create File System Storage on "dir"={:?} : this is not a directory"#,
-                    base_dir
-                )
-            });
+            bail!(
+                r#"Cannot create File System Storage on "dir"={:?} : this is not a directory"#,
+                base_dir
+            )
         } else if let Err(err) = base_dir_path.read_dir() {
-            return zerror!(ZErrorKind::Other {
-                descr: format!(
-                    r#"Cannot create File System Storage on "dir"={:?} : {}"#,
-                    base_dir, err
-                )
-            });
+            bail!(
+                r#"Cannot create File System Storage on "dir"={:?} : {}"#,
+                base_dir,
+                err
+            )
         } else if !read_only {
             // try to write a random file
             let _ = tempfile_in(&base_dir)
                 .map(|mut f| writeln!(f, "test"))
                 .map_err(|err| {
-                    zerror2!(ZErrorKind::Other {
-                        descr: format!(
-                            r#"Cannot create writeable File System Storage on "dir"={:?} : {}"#,
-                            base_dir, err
-                        )
-                    })
+                    zerror!(
+                        r#"Cannot create writeable File System Storage on "dir"={:?} : {}"#,
+                        base_dir,
+                        err
+                    )
                 })?;
         }
 
@@ -269,12 +258,10 @@ impl Storage for FileSystemStorage {
             .strip_prefix(&self.path_prefix)
             .map(|p| self.files_mgr.to_zfile(p))
             .ok_or_else(|| {
-                zerror2!(ZErrorKind::Other {
-                    descr: format!(
-                        "Received a Sample not starting with path_prefix '{}'",
-                        self.path_prefix
-                    )
-                })
+                zerror!(
+                    "Received a Sample not starting with path_prefix '{}'",
+                    self.path_prefix
+                )
             })?;
 
         // get latest timestamp for this file (if referenced in data-info db or if exists on disk)

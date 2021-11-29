@@ -25,7 +25,8 @@ use zenoh::buf::ZBuf;
 use zenoh::prelude::*;
 use zenoh::time::{Timestamp, TimestampId};
 use zenoh::utils::key_expr;
-use zenoh_util::{zerror, zerror2};
+use zenoh::Result as ZResult;
+use zenoh_util::{bail, zerror};
 
 use crate::data_info_mgt::*;
 
@@ -127,11 +128,8 @@ impl FilesMgr {
                     a,
                     conflict_file
                 );
-                rename(a, conflict_file.to_path_buf()).map_err(|e| {
-                    zerror2!(ZErrorKind::Other {
-                        descr: format!("Failed to write in file {:?}: {}", conflict_file, e)
-                    })
-                })?;
+                rename(a, conflict_file.to_path_buf())
+                    .map_err(|e| zerror!("Failed to write in file {:?}: {}", conflict_file, e))?;
                 match self.data_info_mgr.rename_key(a, &conflict_file).await {
                     Ok(_) => None,
                     Err(_) => {
@@ -147,11 +145,9 @@ impl FilesMgr {
             }
         }
 
-        self.dir_builder.create(parent).map_err(|e| {
-            zerror2!(ZErrorKind::Other {
-                descr: format!("Failed to create directories for file {:?}: {}", file, e)
-            })
-        })?;
+        self.dir_builder
+            .create(parent)
+            .map_err(|e| zerror!("Failed to create directories for file {:?}: {}", file, e))?;
 
         // Write file
         trace!("Write in file {:?}", file);
@@ -161,17 +157,11 @@ impl FilesMgr {
             file.to_path_buf()
         };
         trace!("Writing in conflict-free file {:?}", file);
-        let mut f = File::create(&file).map_err(|e| {
-            zerror2!(ZErrorKind::Other {
-                descr: format!("Failed to write in file {:?}: {}", file, e)
-            })
-        })?;
+        let mut f = File::create(&file)
+            .map_err(|e| zerror!("Failed to write in file {:?}: {}", file, e))?;
         for slice in content {
-            f.write_all(slice.as_slice()).map_err(|e| {
-                zerror2!(ZErrorKind::Other {
-                    descr: format!("Failed to write in file {:?}: {}", file, e)
-                })
-            })?;
+            f.write_all(slice.as_slice())
+                .map_err(|e| zerror!("Failed to write in file {:?}: {}", file, e))?;
         }
 
         // save data-info
@@ -203,11 +193,8 @@ impl FilesMgr {
         // Delete file
         trace!("Delete file {:?}", file);
         if file.exists() {
-            remove_file(file.to_path_buf()).map_err(|e| {
-                zerror2!(ZErrorKind::Other {
-                    descr: format!("Failed to delete file {:?}: {}", file, e)
-                })
-            })?;
+            remove_file(file.to_path_buf())
+                .map_err(|e| zerror!("Failed to delete file {:?}: {}", file, e))?;
             // try to delete parent directories if empty
             let mut f = file.as_path();
             while let Some(parent) = f.parent() {
@@ -256,9 +243,7 @@ impl FilesMgr {
                         trace!("Read file {:?}", file);
                         let mut content: Vec<u8> = Vec::with_capacity(size as usize);
                         if let Err(e) = f.read_to_end(&mut content) {
-                            zerror!(ZErrorKind::Other {
-                                descr: format!(r#"Error reading file {:?}: {}"#, file, e)
-                            })
+                            bail!(r#"Error reading file {:?}: {}"#, file, e)
                         } else {
                             let (encoding, timestamp) =
                                 self.get_encoding_and_timestamp(&file.to_path_buf()).await?;
@@ -271,17 +256,10 @@ impl FilesMgr {
                             )))
                         }
                     } else {
-                        zerror!(ZErrorKind::Other {
-                            descr: format!(
-                                r#"Error reading file {:?}: too big to fit in memory"#,
-                                file
-                            )
-                        })
+                        bail!(r#"Error reading file {:?}: too big to fit in memory"#, file)
                     }
                 }
-                Err(e) => zerror!(ZErrorKind::Other {
-                    descr: format!(r#"Error reading file {:?}: {}"#, file, e)
-                }),
+                Err(e) => bail!(r#"Error reading file {:?}: {}"#, file, e),
             }
         } else {
             Ok(None)
@@ -379,13 +357,11 @@ impl FilesMgr {
 
     fn get_timestamp_from_metadata<P: AsRef<Path>>(&self, file: P) -> ZResult<Timestamp> {
         let metadata = metadata(&file).map_err(|e| {
-            zerror2!(ZErrorKind::Other {
-                descr: format!(
-                    "Failed to get meta-data for file {:?}: {}",
-                    file.as_ref(),
-                    e
-                )
-            })
+            zerror!(
+                "Failed to get meta-data for file {:?}: {}",
+                file.as_ref(),
+                e
+            )
         })?;
         let sys_time = metadata
             .modified()
