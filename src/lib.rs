@@ -14,13 +14,16 @@
 
 use async_trait::async_trait;
 use log::{debug, warn};
-use std::fs::DirBuilder;
 use std::io::prelude::*;
 use std::path::PathBuf;
+use std::{fs::DirBuilder, sync::Arc};
 use tempfile::tempfile_in;
+use zenoh::Result as ZResult;
 use zenoh::{prelude::*, time::new_reception_timestamp};
-use zenoh_backend_traits::*;
-use zenoh_util::{zenoh_home, zerror, zerror2};
+use zenoh_backend_traits::{
+    config::BackendConfig, config::StorageConfig, utils, Backend, CreateBackend, Query, Storage,
+};
+use zenoh_util::{bail, zenoh_home, zerror};
 
 mod data_info_mgt;
 mod files_mgt;
@@ -47,8 +50,12 @@ lazy_static::lazy_static!(
     static ref LONG_VERSION: String = format!("{} built with {}", GIT_VERSION, env!("RUSTC_VERSION"));
 );
 
+#[allow(dead_code)]
+/// Serves as typecheck for the create_backend function, ensuring it has the expected signature
+const CREATE_BACKEND_TYPECHECK: CreateBackend = create_backend;
+
 #[no_mangle]
-pub fn create_backend(_unused: &Properties) -> ZResult<Box<dyn Backend>> {
+pub fn create_backend(_unused: BackendConfig) -> ZResult<Box<dyn Backend>> {
     // For some reasons env_logger is sometime not active in a loaded library.
     // Try to activate it here, ignoring failures.
     let _ = env_logger::try_init();
@@ -76,103 +83,65 @@ pub struct FileSystemBackend {
     root: PathBuf,
 }
 
+fn extract_bool(
+    from: &serde_json::Map<String, serde_json::Value>,
+    key: &str,
+    default: bool,
+) -> ZResult<bool> {
+    match from.get(key) {
+        Some(serde_json::Value::Bool(s)) => Ok(*s),
+        None => Ok(default),
+        _ => bail!(
+            r#"Invalid value for File System Storage configuration: `{}` must be a boolean"#,
+            key
+        ),
+    }
+}
+
 #[async_trait]
 impl Backend for FileSystemBackend {
     async fn get_admin_status(&self) -> Value {
         self.admin_status.clone()
     }
 
-    async fn create_storage(&mut self, props: Properties) -> ZResult<Box<dyn Storage>> {
-        let path_expr = props.get(PROP_STORAGE_KEY_EXPR).unwrap();
-        let path_prefix = props
-            .get(PROP_STORAGE_KEY_PREFIX)
-            .ok_or_else(|| {
-                zerror2!(ZErrorKind::Other {
-                    descr: format!(
-                        r#"Missing required property for File System Storage: "{}""#,
-                        PROP_STORAGE_KEY_PREFIX
-                    )
-                })
-            })?
-            .clone();
+    async fn create_storage(&mut self, mut config: StorageConfig) -> ZResult<Box<dyn Storage>> {
+        let path_expr = config.key_expr.clone();
+        let path_prefix = config.truncate.clone();
         if !path_expr.starts_with(&path_prefix) {
-            return zerror!(ZErrorKind::Other {
-                descr: format!(
-                    r#"The specified "{}={}" is not a prefix of "{}={}""#,
-                    PROP_STORAGE_KEY_PREFIX, path_prefix, PROP_STORAGE_KEY_EXPR, path_expr
-                )
-            });
+            bail!(
+                r#"The specified "truncate={}" is not a prefix of "key_expr={}""#,
+                path_prefix,
+                path_expr
+            )
         }
 
-        let read_only = props.contains_key(PROP_STORAGE_READ_ONLY);
-        let follow_links = match props.get(PROP_STORAGE_FOLLOW_LINK) {
-            Some(s) => {
-                if s.eq_ignore_ascii_case("true") || s.eq_ignore_ascii_case("yes") {
-                    true
-                } else if s.eq_ignore_ascii_case("false") || s.eq_ignore_ascii_case("no") {
-                    false
-                } else {
-                    return zerror!(ZErrorKind::Other {
-                        descr: format!(
-                            r#"Invalid value for File System Storage property "{}={}""#,
-                            PROP_STORAGE_FOLLOW_LINK, s
-                        )
-                    });
-                }
-            }
-            None => false,
-        };
-        let keep_mime = match props.get(PROP_STORAGE_KEEP_MIME) {
-            Some(s) => {
-                if s.eq_ignore_ascii_case("true") || s.eq_ignore_ascii_case("yes") {
-                    true
-                } else if s.eq_ignore_ascii_case("false") || s.eq_ignore_ascii_case("no") {
-                    false
-                } else {
-                    return zerror!(ZErrorKind::Other {
-                        descr: format!(
-                            r#"Invalid value for File System Storage property "{}={}""#,
-                            PROP_STORAGE_KEEP_MIME, s
-                        )
-                    });
-                }
-            }
-            None => true,
-        };
-
-        let on_closure = match props.get(PROP_STORAGE_ON_CLOSURE) {
-            Some(s) => {
-                if s == "delete_all" {
-                    OnClosure::DeleteAll
-                } else {
-                    return zerror!(ZErrorKind::Other {
-                        descr: format!("Unsupported value for 'on_closure' property: {}", s)
-                    });
-                }
-            }
+        let read_only = extract_bool(&config.rest, PROP_STORAGE_READ_ONLY, false)?;
+        let follow_links = extract_bool(&config.rest, PROP_STORAGE_FOLLOW_LINK, false)?;
+        let keep_mime = extract_bool(&config.rest, PROP_STORAGE_KEEP_MIME, true)?;
+        let on_closure = match config.rest.get(PROP_STORAGE_ON_CLOSURE) {
+            Some(serde_json::Value::String(s)) if s == "delete_all" => OnClosure::DeleteAll,
+            Some(serde_json::Value::String(s)) if s == "do_nothing" => OnClosure::DoNothing,
             None => OnClosure::DoNothing,
+            Some(s) => {
+                bail!(
+                    r#"Unsupported value {:?} for `on_closure` property: must be either "delete_all" or "do_nothing". Default is "do_nothing""#,
+                    s
+                )
+            }
         };
 
-        let base_dir = props
-            .get(PROP_STORAGE_DIR)
-            .map(|dir| {
+        let base_dir =
+            if let Some(serde_json::Value::String(dir)) = config.rest.get(PROP_STORAGE_DIR) {
                 // prepend base_dir with self.root
                 let mut base_dir = self.root.clone();
-                for segment in dir.split(std::path::MAIN_SEPARATOR) {
-                    if !segment.is_empty() {
-                        base_dir.push(segment);
-                    }
-                }
+                base_dir.push(dir);
                 base_dir
-            })
-            .ok_or_else(|| {
-                zerror2!(ZErrorKind::Other {
-                    descr: format!(
-                        r#"Missing required property for File System Storage: "{}""#,
-                        PROP_STORAGE_DIR
-                    )
-                })
-            })?;
+            } else {
+                bail!(
+                    r#"Missing required property for File System Storage: "{}""#,
+                    PROP_STORAGE_DIR
+                )
+            };
 
         // check if base_dir exists and is readable (and writeable if not "read_only" mode)
         let mut dir_builder = DirBuilder::new();
@@ -180,66 +149,61 @@ impl Backend for FileSystemBackend {
         let base_dir_path = PathBuf::from(&base_dir);
         if !base_dir_path.exists() {
             if let Err(err) = dir_builder.create(&base_dir) {
-                return zerror!(ZErrorKind::Other {
-                    descr: format!(
-                        r#"Cannot create File System Storage on "dir"={:?} : {}"#,
-                        base_dir, err
-                    )
-                });
+                bail!(
+                    r#"Cannot create File System Storage on "dir"={:?} : {}"#,
+                    base_dir,
+                    err
+                )
             }
         } else if !base_dir_path.is_dir() {
-            return zerror!(ZErrorKind::Other {
-                descr: format!(
-                    r#"Cannot create File System Storage on "dir"={:?} : this is not a directory"#,
-                    base_dir
-                )
-            });
+            bail!(
+                r#"Cannot create File System Storage on "dir"={:?} : this is not a directory"#,
+                base_dir
+            )
         } else if let Err(err) = base_dir_path.read_dir() {
-            return zerror!(ZErrorKind::Other {
-                descr: format!(
-                    r#"Cannot create File System Storage on "dir"={:?} : {}"#,
-                    base_dir, err
-                )
-            });
+            bail!(
+                r#"Cannot create File System Storage on "dir"={:?} : {}"#,
+                base_dir,
+                err
+            )
         } else if !read_only {
             // try to write a random file
             let _ = tempfile_in(&base_dir)
                 .map(|mut f| writeln!(f, "test"))
                 .map_err(|err| {
-                    zerror2!(ZErrorKind::Other {
-                        descr: format!(
-                            r#"Cannot create writeable File System Storage on "dir"={:?} : {}"#,
-                            base_dir, err
-                        )
-                    })
+                    zerror!(
+                        r#"Cannot create writeable File System Storage on "dir"={:?} : {}"#,
+                        base_dir,
+                        err
+                    )
                 })?;
         }
 
-        let mut props = props.clone();
-        props.insert("dir_full_path".into(), base_dir.to_string_lossy().into());
+        config
+            .rest
+            .insert("dir_full_path".into(), base_dir.to_string_lossy().into());
 
         let files_mgr = FilesMgr::new(base_dir, follow_links, keep_mime, on_closure).await?;
 
-        let admin_status = zenoh::properties::properties_to_json_value(&props);
         Ok(Box::new(FileSystemStorage {
-            admin_status,
+            admin_status: config,
             path_prefix,
             files_mgr,
             read_only,
         }))
     }
 
-    fn incoming_data_interceptor(&self) -> Option<Box<dyn IncomingDataInterceptor>> {
+    fn incoming_data_interceptor(&self) -> Option<Arc<dyn Fn(Sample) -> Sample + Sync + Send>> {
         None
     }
 
-    fn outgoing_data_interceptor(&self) -> Option<Box<dyn OutgoingDataInterceptor>> {
+    fn outgoing_data_interceptor(&self) -> Option<Arc<dyn Fn(Sample) -> Sample + Sync + Send>> {
         None
     }
 }
 
 struct FileSystemStorage {
-    admin_status: Value,
+    admin_status: StorageConfig,
     path_prefix: String,
     files_mgr: FilesMgr,
     read_only: bool,
@@ -282,23 +246,22 @@ impl FileSystemStorage {
 #[async_trait]
 impl Storage for FileSystemStorage {
     async fn get_admin_status(&self) -> Value {
-        self.admin_status.clone()
+        self.admin_status.to_json_value().into()
     }
 
     // When receiving a Sample (i.e. on PUT or DELETE operations)
     async fn on_sample(&mut self, sample: Sample) -> ZResult<()> {
         // strip path from "path_prefix" and converted to a ZFile
         let zfile = sample
-            .res_name
+            .key_expr
+            .try_as_str()?
             .strip_prefix(&self.path_prefix)
             .map(|p| self.files_mgr.to_zfile(p))
             .ok_or_else(|| {
-                zerror2!(ZErrorKind::Other {
-                    descr: format!(
-                        "Received a Sample not starting with path_prefix '{}'",
-                        self.path_prefix
-                    )
-                })
+                zerror!(
+                    "Received a Sample not starting with path_prefix '{}'",
+                    self.path_prefix
+                )
             })?;
 
         // get latest timestamp for this file (if referenced in data-info db or if exists on disk)
@@ -308,7 +271,7 @@ impl Storage for FileSystemStorage {
             if sample_ts < old_ts {
                 debug!(
                     "{} on {} dropped: out-of-date",
-                    sample.kind, sample.res_name
+                    sample.kind, sample.key_expr
                 );
                 return Ok(());
             }
@@ -348,7 +311,7 @@ impl Storage for FileSystemStorage {
                 }
             }
             SampleKind::Patch => {
-                warn!("Received PATCH for {}: not yet supported", sample.res_name);
+                warn!("Received PATCH for {}: not yet supported", sample.key_expr);
                 Ok(())
             }
         }
@@ -361,7 +324,8 @@ impl Storage for FileSystemStorage {
 
         // get the list of sub-path expressions that will match the same stored keys than
         // the selector, if those keys had the path_prefix.
-        let sub_selectors = utils::get_sub_key_selectors(selector.key_selector, &self.path_prefix);
+        let sub_selectors =
+            utils::get_sub_key_selectors(selector.key_selector.try_as_str()?, &self.path_prefix);
         debug!(
             "Query on {} with path_prefix={} => sub_selectors = {:?}",
             selector.key_selector, self.path_prefix, sub_selectors

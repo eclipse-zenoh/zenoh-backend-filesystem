@@ -22,10 +22,11 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use walkdir::{IntoIter, WalkDir};
 use zenoh::buf::ZBuf;
-use zenoh::net::protocol::core::rname;
 use zenoh::prelude::*;
 use zenoh::time::{Timestamp, TimestampId};
-use zenoh_util::{zerror, zerror2};
+use zenoh::utils::key_expr;
+use zenoh::Result as ZResult;
+use zenoh_util::{bail, zerror};
 
 use crate::data_info_mgt::*;
 
@@ -127,17 +128,14 @@ impl FilesMgr {
                     a,
                     conflict_file
                 );
-                rename(a, conflict_file.to_path_buf()).map_err(|e| {
-                    zerror2!(ZErrorKind::Other {
-                        descr: format!("Failed to write in file {:?}: {}", conflict_file, e)
-                    })
-                })?;
+                rename(a, conflict_file.to_path_buf())
+                    .map_err(|e| zerror!("Failed to write in file {:?}: {}", conflict_file, e))?;
                 match self.data_info_mgr.rename_key(a, &conflict_file).await {
                     Ok(_) => None,
                     Err(_) => {
                         // fallback: get encoding and timestamp from file's metadata
                         let (a_encoding, a_timestamp) =
-                            self.generate_metadata(&a.to_path_buf(), &timestamp);
+                            self.generate_metadata(&a.to_path_buf(), timestamp);
                         self.data_info_mgr
                             .put_data_info(file, &a_encoding, &a_timestamp)
                             .await
@@ -147,11 +145,9 @@ impl FilesMgr {
             }
         }
 
-        self.dir_builder.create(parent).map_err(|e| {
-            zerror2!(ZErrorKind::Other {
-                descr: format!("Failed to create directories for file {:?}: {}", file, e)
-            })
-        })?;
+        self.dir_builder
+            .create(parent)
+            .map_err(|e| zerror!("Failed to create directories for file {:?}: {}", file, e))?;
 
         // Write file
         trace!("Write in file {:?}", file);
@@ -161,17 +157,11 @@ impl FilesMgr {
             file.to_path_buf()
         };
         trace!("Writing in conflict-free file {:?}", file);
-        let mut f = File::create(&file).map_err(|e| {
-            zerror2!(ZErrorKind::Other {
-                descr: format!("Failed to write in file {:?}: {}", file, e)
-            })
-        })?;
+        let mut f = File::create(&file)
+            .map_err(|e| zerror!("Failed to write in file {:?}: {}", file, e))?;
         for slice in content {
-            f.write_all(slice.as_slice()).map_err(|e| {
-                zerror2!(ZErrorKind::Other {
-                    descr: format!("Failed to write in file {:?}: {}", file, e)
-                })
-            })?;
+            f.write_all(slice.as_slice())
+                .map_err(|e| zerror!("Failed to write in file {:?}: {}", file, e))?;
         }
 
         // save data-info
@@ -203,11 +193,8 @@ impl FilesMgr {
         // Delete file
         trace!("Delete file {:?}", file);
         if file.exists() {
-            remove_file(file.to_path_buf()).map_err(|e| {
-                zerror2!(ZErrorKind::Other {
-                    descr: format!("Failed to delete file {:?}: {}", file, e)
-                })
-            })?;
+            remove_file(file.to_path_buf())
+                .map_err(|e| zerror!("Failed to delete file {:?}: {}", file, e))?;
             // try to delete parent directories if empty
             let mut f = file.as_path();
             while let Some(parent) = f.parent() {
@@ -245,7 +232,7 @@ impl FilesMgr {
         self.perform_read(&file.to_path_buf()).await
     }
 
-    async fn perform_read(&self, file: &PathBuf) -> ZResult<Option<(Value, Timestamp)>> {
+    async fn perform_read(&self, file: &Path) -> ZResult<Option<(Value, Timestamp)>> {
         // consider file only is it exists, it's a file and in case of "follow_links=true" it doesn't contain symlink
         if file.exists() && file.is_file() && (self.follow_links || !self.contains_symlink(&file)) {
             match File::open(&file) {
@@ -256,9 +243,7 @@ impl FilesMgr {
                         trace!("Read file {:?}", file);
                         let mut content: Vec<u8> = Vec::with_capacity(size as usize);
                         if let Err(e) = f.read_to_end(&mut content) {
-                            zerror!(ZErrorKind::Other {
-                                descr: format!(r#"Error reading file {:?}: {}"#, file, e)
-                            })
+                            bail!(r#"Error reading file {:?}: {}"#, file, e)
                         } else {
                             let (encoding, timestamp) =
                                 self.get_encoding_and_timestamp(&file.to_path_buf()).await?;
@@ -271,17 +256,10 @@ impl FilesMgr {
                             )))
                         }
                     } else {
-                        zerror!(ZErrorKind::Other {
-                            descr: format!(
-                                r#"Error reading file {:?}: too big to fit in memory"#,
-                                file
-                            )
-                        })
+                        bail!(r#"Error reading file {:?}: too big to fit in memory"#, file)
                     }
                 }
-                Err(e) => zerror!(ZErrorKind::Other {
-                    descr: format!(r#"Error reading file {:?}: {}"#, file, e)
-                }),
+                Err(e) => bail!(r#"Error reading file {:?}: {}"#, file, e),
             }
         } else {
             Ok(None)
@@ -326,22 +304,22 @@ impl FilesMgr {
         }
     }
 
-    fn generate_metadata(&self, file: &PathBuf, timestamp: &Timestamp) -> (Encoding, Timestamp) {
-        let a_encoding = self.guess_encoding(&file);
+    fn generate_metadata(&self, file: &Path, timestamp: &Timestamp) -> (Encoding, Timestamp) {
+        let a_encoding = self.guess_encoding(file);
         let a_timestamp = match self.get_timestamp_from_metadata(file) {
             Ok(a_ts) => a_ts,
-            Err(_) => timestamp.clone(),
+            Err(_) => *timestamp,
         };
         (a_encoding, a_timestamp)
     }
 
-    async fn get_encoding_and_timestamp(&self, file: &PathBuf) -> ZResult<(Encoding, Timestamp)> {
+    async fn get_encoding_and_timestamp(&self, file: &Path) -> ZResult<(Encoding, Timestamp)> {
         // try to get Encoding and Timestamp from data_info_mgr
         match self.data_info_mgr.get_encoding_and_timestamp(&file).await? {
             Some((encoding, timestamp)) => Ok((encoding, timestamp)),
             None => {
                 trace!("data-info for {:?} not found; fallback to metadata", file);
-                let encoding = self.guess_encoding(&file);
+                let encoding = self.guess_encoding(file);
                 // fallback: get timestamp from file's metadata
                 let timestamp = self.get_timestamp_from_metadata(file)?;
 
@@ -350,7 +328,7 @@ impl FilesMgr {
         }
     }
 
-    fn guess_encoding(&self, file: &PathBuf) -> Encoding {
+    fn guess_encoding(&self, file: &Path) -> Encoding {
         if self.keep_mime {
             // fallback: guess mime type from file extension
             let mime_type = mime_guess::from_path(&file).first_or_octet_stream();
@@ -379,13 +357,11 @@ impl FilesMgr {
 
     fn get_timestamp_from_metadata<P: AsRef<Path>>(&self, file: P) -> ZResult<Timestamp> {
         let metadata = metadata(&file).map_err(|e| {
-            zerror2!(ZErrorKind::Other {
-                descr: format!(
-                    "Failed to get meta-data for file {:?}: {}",
-                    file.as_ref(),
-                    e
-                )
-            })
+            zerror!(
+                "Failed to get meta-data for file {:?}: {}",
+                file.as_ref(),
+                e
+            )
         })?;
         let sys_time = metadata
             .modified()
@@ -469,7 +445,7 @@ impl<'a> Iterator for FilesIterator<'a> {
                             // zpath trims away the CONFLICT_SUFFIX if present
                             let zpath = Cow::from(get_trimmed_keyexpr(&coarse_zpath));
                             // convert it to zenoh path for matching test with zpath_expr
-                            if rname::intersect(&zpath, self.zpath_expr) {
+                            if key_expr::intersect(&zpath, self.zpath_expr) {
                                 // matching file; return a ZFile
                                 let zfile = ZFile {
                                     zpath,
@@ -535,7 +511,7 @@ pub(crate) fn get_trimmed_keyexpr(keyexpr: &str) -> String {
     if keyexpr.ends_with(CONFLICT_SUFFIX) {
         keyexpr
             .strip_suffix(CONFLICT_SUFFIX)
-            .unwrap_or(keyexpr.as_ref())
+            .unwrap_or(keyexpr)
             .to_string()
     } else {
         keyexpr.to_string()

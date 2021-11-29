@@ -20,8 +20,9 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use zenoh::buf::{WBuf, ZBuf};
 use zenoh::prelude::*;
 use zenoh::time::{Timestamp, NTP64};
+use zenoh::Result as ZResult;
 use zenoh_util::collections::{Timed, TimedEvent, Timer};
-use zenoh_util::{zerror, zerror2};
+use zenoh_util::{bail, zerror};
 
 lazy_static::lazy_static! {
     static ref GC_PERIOD: Duration = Duration::new(30, 0);
@@ -45,12 +46,11 @@ impl DataInfoMgr {
         backup_file.push(DataInfoMgr::DB_FILENAME);
 
         let db = DB::open_default(&backup_file).map_err(|e| {
-            zerror2!(ZErrorKind::Other {
-                descr: format!(
-                    "Failed to open data-info database from {:?}: {}",
-                    backup_file, e
-                )
-            })
+            zerror!(
+                "Failed to open data-info database from {:?}: {}",
+                backup_file,
+                e
+            )
         })?;
         let db = Arc::new(Mutex::new(db));
 
@@ -67,11 +67,7 @@ impl DataInfoMgr {
         // Flush before to close
         db.flush()
             .and_then(|()| DB::destroy(&rocksdb::Options::default(), db.path()))
-            .map_err(|err| {
-                zerror2!(ZErrorKind::Other {
-                    descr: format!("Failed to close data-info database: {}", err)
-                })
-            })
+            .map_err(|err| zerror!("Failed to close data-info database: {}", err).into())
     }
 
     pub(crate) async fn put_data_info<P: AsRef<Path>>(
@@ -88,18 +84,14 @@ impl DataInfoMgr {
             && value.write_zint(encoding.prefix)
             && value.write_string(&encoding.suffix);
         if !write_ok {
-            zerror!(ZErrorKind::Other {
-                descr: format!("Failed to encode data-info for {:?}", file.as_ref())
-            })
+            bail!("Failed to encode data-info for {:?}", file.as_ref())
         } else {
             self.db
                 .lock()
                 .await
                 .put(key.as_bytes(), value.get_first_slice(..))
                 .map_err(|e| {
-                    zerror2!(ZErrorKind::Other {
-                        descr: format!("Failed to save data-info for {:?}: {}", file.as_ref(), e)
-                    })
+                    zerror!("Failed to save data-info for {:?}: {}", file.as_ref(), e).into()
                 })
         }
     }
@@ -113,28 +105,20 @@ impl DataInfoMgr {
         match val {
             Ok(Some(pin_val)) => {
                 db_instance.put(to_key.as_bytes(), pin_val).map_err(|e| {
-                    zerror2!(ZErrorKind::Other {
-                        descr: format!("Failed to save data-info for {:?}: {}", to.as_ref(), e)
-                    })
+                    zerror!("Failed to save data-info for {:?}: {}", to.as_ref(), e)
                 })?;
                 db_instance.delete(from_key.as_bytes()).map_err(|e| {
-                    zerror2!(ZErrorKind::Other {
-                        descr: format!("Failed to save data-info for {:?}: {}", to.as_ref(), e)
-                    })
+                    zerror!("Failed to save data-info for {:?}: {}", to.as_ref(), e).into()
                 })
             }
             Ok(None) => {
                 trace!("data-info for {:?} not found", from.as_ref());
-                zerror!(ZErrorKind::Other {
-                    descr: format!(
-                        "Failed to get data-info for {:?}: data-info not found",
-                        from.as_ref()
-                    )
-                })
+                bail!(
+                    "Failed to get data-info for {:?}: data-info not found",
+                    from.as_ref()
+                )
             }
-            Err(e) => zerror!(ZErrorKind::Other {
-                descr: format!("Failed to get data-info for {:?}: {}", from.as_ref(), e)
-            }),
+            Err(e) => bail!("Failed to get data-info for {:?}: {}", from.as_ref(), e),
         }
     }
 
@@ -150,9 +134,7 @@ impl DataInfoMgr {
                 trace!("data-info for {:?} not found", file.as_ref());
                 Ok(None)
             }
-            Err(e) => zerror!(ZErrorKind::Other {
-                descr: format!("Failed to get data-info for {:?}: {}", file.as_ref(), e)
-            }),
+            Err(e) => bail!("Failed to get data-info for {:?}: {}", file.as_ref(), e),
         }
     }
 
@@ -168,30 +150,22 @@ impl DataInfoMgr {
                 trace!("timestamp for {:?} not found", file.as_ref());
                 Ok(None)
             }
-            Err(e) => zerror!(ZErrorKind::Other {
-                descr: format!("Failed to get data-info for {:?}: {}", file.as_ref(), e)
-            }),
+            Err(e) => bail!("Failed to get data-info for {:?}: {}", file.as_ref(), e),
         }
     }
 }
 
 fn decode_encoding_timestamp_from_value(val: &[u8]) -> ZResult<(Encoding, Timestamp)> {
     let mut buf = ZBuf::from(val.to_vec());
-    let timestamp = buf.read_timestamp().ok_or_else(|| {
-        zerror2!(ZErrorKind::Other {
-            descr: "Failed to decode data-info (timestamp)".to_string()
-        })
-    })?;
-    let encoding_prefix = buf.read_zint().ok_or_else(|| {
-        zerror2!(ZErrorKind::Other {
-            descr: "Failed to decode data-info (encoding.prefix)".to_string()
-        })
-    })?;
-    let encoding_suffix = buf.read_string().ok_or_else(|| {
-        zerror2!(ZErrorKind::Other {
-            descr: "Failed to decode data-info (encoding.suffix)".to_string()
-        })
-    })?;
+    let timestamp = buf
+        .read_timestamp()
+        .ok_or_else(|| zerror!("Failed to decode data-info (timestamp)"))?;
+    let encoding_prefix = buf
+        .read_zint()
+        .ok_or_else(|| zerror!("Failed to decode data-info (encoding.prefix)"))?;
+    let encoding_suffix = buf
+        .read_string()
+        .ok_or_else(|| zerror!("Failed to decode data-info (encoding.suffix)"))?;
     Ok((
         Encoding {
             prefix: encoding_prefix,
@@ -203,11 +177,9 @@ fn decode_encoding_timestamp_from_value(val: &[u8]) -> ZResult<(Encoding, Timest
 
 fn decode_timestamp_from_value(val: &[u8]) -> ZResult<Timestamp> {
     let mut buf = ZBuf::from(val.to_vec());
-    let timestamp = buf.read_timestamp().ok_or_else(|| {
-        zerror2!(ZErrorKind::Other {
-            descr: "Failed to decode data-info (timestamp)".to_string()
-        })
-    })?;
+    let timestamp = buf
+        .read_timestamp()
+        .ok_or_else(|| zerror!("Failed to decode data-info (timestamp)"))?;
     Ok(timestamp)
 }
 
