@@ -15,18 +15,22 @@ use async_std::task;
 use log::{debug, trace, warn};
 use std::borrow::Cow;
 use std::fmt;
-use std::fs::{metadata, remove_dir, remove_dir_all, remove_file, DirBuilder, File};
+use std::fs::{metadata, remove_dir, remove_dir_all, remove_file, rename, DirBuilder, File};
 use std::io::prelude::*;
 use std::iter::Iterator;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use walkdir::{IntoIter, WalkDir};
-use zenoh::net::utils::resource_name;
-use zenoh::net::{encoding, ZBuf, ZInt};
-use zenoh::{Timestamp, TimestampId, Value, ZError, ZErrorKind, ZResult};
-use zenoh_util::{zerror, zerror2};
+use zenoh::buf::ZBuf;
+use zenoh::prelude::*;
+use zenoh::time::{Timestamp, TimestampId};
+use zenoh::utils::key_expr;
+use zenoh::Result as ZResult;
+use zenoh_util::{bail, zerror};
 
 use crate::data_info_mgt::*;
+
+pub const CONFLICT_SUFFIX: &str = ".##z";
 
 pub(crate) enum OnClosure {
     DeleteAll,
@@ -34,6 +38,7 @@ pub(crate) enum OnClosure {
 }
 
 // a structure holding a zenoh path (absolute) and the corresponding file-system path (including the base_dir)
+#[derive(Debug)]
 pub(crate) struct ZFile<'a> {
     pub(crate) zpath: Cow<'a, str>,
     fspath: PathBuf,
@@ -43,11 +48,6 @@ impl fmt::Display for ZFile<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self.fspath)
     }
-}
-
-enum Encoding {
-    ZCode(ZInt),
-    Mime(String),
 }
 
 pub(crate) struct FilesMgr {
@@ -98,37 +98,70 @@ impl FilesMgr {
         PathBuf::from(os_str)
     }
 
+    // ### Behaviour in case of conflict
+    // A possible case of conflict occurs when a PUT operation operates on a prefix of another PUT.
+    // This leads to having a directory and file with the same name which is forbidden on file systems.
+    // We fix this by appending a suffix `.##z` to the conflicting file. This is dealt with internally and not exposed to the user.
+
     pub(crate) async fn write_file(
         &self,
         zfile: &ZFile<'_>,
         content: ZBuf,
-        encoding: ZInt,
-        timestamp: Timestamp,
+        encoding: &Encoding,
+        timestamp: &Timestamp,
     ) -> ZResult<()> {
         let file = &zfile.fspath;
 
         // Create parent directories if needed
-        if let Some(dir) = file.parent() {
-            self.dir_builder.create(dir).map_err(|e| {
-                zerror2!(ZErrorKind::Other {
-                    descr: format!("Failed to create directories for file {:?}: {}", file, e)
-                })
-            })?;
+        let parent = file.parent().unwrap();
+        let ancestor = parent.ancestors().collect::<Vec<_>>();
+        for a in ancestor {
+            // if the ancestor is a directory, break, no need to check anything else
+            if a.exists() && a.is_dir() {
+                break;
+            }
+            // if the ancestor is a file, rename the file with a conflict suffix and update the info on rocksdb
+            if a.exists() && a.is_file() {
+                let conflict_file = self.get_conflict_file(a.to_path_buf());
+                trace!(
+                    "Conflict detected for {:?}. Writing to conflict free file {:?}",
+                    a,
+                    conflict_file
+                );
+                rename(a, conflict_file.to_path_buf())
+                    .map_err(|e| zerror!("Failed to write in file {:?}: {}", conflict_file, e))?;
+                match self.data_info_mgr.rename_key(a, &conflict_file).await {
+                    Ok(_) => None,
+                    Err(_) => {
+                        // fallback: get encoding and timestamp from file's metadata
+                        let (a_encoding, a_timestamp) =
+                            self.generate_metadata(&a.to_path_buf(), timestamp);
+                        self.data_info_mgr
+                            .put_data_info(file, &a_encoding, &a_timestamp)
+                            .await
+                            .ok()
+                    }
+                };
+            }
         }
+
+        self.dir_builder
+            .create(parent)
+            .map_err(|e| zerror!("Failed to create directories for file {:?}: {}", file, e))?;
 
         // Write file
         trace!("Write in file {:?}", file);
-        let mut f = File::create(&file).map_err(|e| {
-            zerror2!(ZErrorKind::Other {
-                descr: format!("Failed to write in file {:?}: {}", file, e)
-            })
-        })?;
+        let file = if file.exists() && file.is_dir() {
+            self.get_conflict_file(file.to_path_buf())
+        } else {
+            file.to_path_buf()
+        };
+        trace!("Writing in conflict-free file {:?}", file);
+        let mut f = File::create(&file)
+            .map_err(|e| zerror!("Failed to write in file {:?}: {}", file, e))?;
         for slice in content {
-            f.write_all(slice.as_slice()).map_err(|e| {
-                zerror2!(ZErrorKind::Other {
-                    descr: format!("Failed to write in file {:?}: {}", file, e)
-                })
-            })?;
+            f.write_all(slice.as_slice())
+                .map_err(|e| zerror!("Failed to write in file {:?}: {}", file, e))?;
         }
 
         // save data-info
@@ -137,32 +170,47 @@ impl FilesMgr {
             .await
     }
 
-    pub(crate) async fn delete_file(&self, zfile: &ZFile<'_>, timestamp: Timestamp) -> ZResult<()> {
+    fn get_conflict_file(&self, file: PathBuf) -> PathBuf {
+        match file.to_str() {
+            Some(x) => PathBuf::from(get_conflict_resolved_keyexpr(x)),
+            None => file.to_path_buf(),
+        }
+    }
+
+    pub(crate) async fn delete_file(
+        &self,
+        zfile: &ZFile<'_>,
+        timestamp: &Timestamp,
+    ) -> ZResult<()> {
         let file = &zfile.fspath;
+
+        let file = if file.exists() && file.is_file() {
+            file.to_path_buf()
+        } else {
+            self.get_conflict_file(file.to_path_buf())
+        };
 
         // Delete file
         trace!("Delete file {:?}", file);
         if file.exists() {
-            remove_file(file).map_err(|e| {
-                zerror2!(ZErrorKind::Other {
-                    descr: format!("Failed to delete file {:?}: {}", file, e)
-                })
-            })?;
-        }
-
-        // try to delete parent directories if empty
-        let mut f = file.as_path();
-        while let Some(parent) = f.parent() {
-            if parent != self.base_dir() && remove_dir(parent).is_ok() {
-                trace!("Removed empty dir: {:?}", parent);
-            } else {
-                break;
+            remove_file(file.to_path_buf())
+                .map_err(|e| zerror!("Failed to delete file {:?}: {}", file, e))?;
+            // try to delete parent directories if empty
+            let mut f = file.as_path();
+            while let Some(parent) = f.parent() {
+                if parent != self.base_dir() && remove_dir(parent).is_ok() {
+                    trace!("Removed empty dir: {:?}", parent);
+                } else {
+                    break;
+                }
+                f = parent;
             }
-            f = parent;
         }
 
         // save timestamp in data-info (encoding is not used)
-        self.data_info_mgr.put_data_info(file, 0, timestamp).await
+        self.data_info_mgr
+            .put_data_info(file, &Encoding::EMPTY, timestamp)
+            .await
     }
 
     // Read a file and return it's content (as Vec<u8>), encoding and timestamp.
@@ -170,8 +218,23 @@ impl FilesMgr {
     // Otherwise, the encoding is guessed from the file extension, and the timestamp is computed from the file's time.
     pub(crate) async fn read_file(&self, zfile: &ZFile<'_>) -> ZResult<Option<(Value, Timestamp)>> {
         let file = &zfile.fspath;
+        match self.perform_read(&file.to_path_buf()).await? {
+            Some(x) => Ok(Some(x)),
+            None => self.perform_read_from_conflict(file.to_path_buf()).await,
+        }
+    }
+
+    async fn perform_read_from_conflict(
+        &self,
+        file: PathBuf,
+    ) -> ZResult<Option<(Value, Timestamp)>> {
+        let file = self.get_conflict_file(file.to_path_buf());
+        self.perform_read(&file.to_path_buf()).await
+    }
+
+    async fn perform_read(&self, file: &Path) -> ZResult<Option<(Value, Timestamp)>> {
         // consider file only is it exists, it's a file and in case of "follow_links=true" it doesn't contain symlink
-        if file.exists() && file.is_file() && (self.follow_links || !self.contains_symlink(file)) {
+        if file.exists() && file.is_file() && (self.follow_links || !self.contains_symlink(&file)) {
             match File::open(&file) {
                 Ok(mut f) => {
                     // TODO: what if file is too big ??
@@ -180,42 +243,23 @@ impl FilesMgr {
                         trace!("Read file {:?}", file);
                         let mut content: Vec<u8> = Vec::with_capacity(size as usize);
                         if let Err(e) = f.read_to_end(&mut content) {
-                            zerror!(ZErrorKind::Other {
-                                descr: format!(r#"Error reading file {:?}: {}"#, file, e)
-                            })
+                            bail!(r#"Error reading file {:?}: {}"#, file, e)
                         } else {
                             let (encoding, timestamp) =
-                                self.get_encoding_and_timestamp(zfile).await?;
-                            // Depending on found encoding and keep_mime flag, return a Raw or Custom Value
-                            match (encoding, self.keep_mime) {
-                                (Encoding::ZCode(code), _) => {
-                                    Ok(Some((Value::Raw(code, content.into()), timestamp)))
-                                }
-                                (Encoding::Mime(mime), true) => Ok(Some((
-                                    Value::Custom {
-                                        encoding_descr: mime,
-                                        data: content.into(),
-                                    },
-                                    timestamp,
-                                ))),
-                                (Encoding::Mime(_), false) => Ok(Some((
-                                    Value::Raw(encoding::APP_OCTET_STREAM, content.into()),
-                                    timestamp,
-                                ))),
-                            }
+                                self.get_encoding_and_timestamp(&file.to_path_buf()).await?;
+                            Ok(Some((
+                                Value {
+                                    payload: content.into(),
+                                    encoding,
+                                },
+                                timestamp,
+                            )))
                         }
                     } else {
-                        zerror!(ZErrorKind::Other {
-                            descr: format!(
-                                r#"Error reading file {:?}: too big to fit in memory"#,
-                                file
-                            )
-                        })
+                        bail!(r#"Error reading file {:?}: too big to fit in memory"#, file)
                     }
                 }
-                Err(e) => zerror!(ZErrorKind::Other {
-                    descr: format!(r#"Error reading file {:?}: {}"#, file, e)
-                }),
+                Err(e) => bail!(r#"Error reading file {:?}: {}"#, file, e),
             }
         } else {
             Ok(None)
@@ -260,39 +304,37 @@ impl FilesMgr {
         }
     }
 
-    async fn get_encoding_and_timestamp(
-        &self,
-        zfile: &ZFile<'_>,
-    ) -> ZResult<(Encoding, Timestamp)> {
-        let file = &zfile.fspath;
+    fn generate_metadata(&self, file: &Path, timestamp: &Timestamp) -> (Encoding, Timestamp) {
+        let a_encoding = self.guess_encoding(file);
+        let a_timestamp = match self.get_timestamp_from_metadata(file) {
+            Ok(a_ts) => a_ts,
+            Err(_) => *timestamp,
+        };
+        (a_encoding, a_timestamp)
+    }
+
+    async fn get_encoding_and_timestamp(&self, file: &Path) -> ZResult<(Encoding, Timestamp)> {
         // try to get Encoding and Timestamp from data_info_mgr
-        match self.data_info_mgr.get_encoding_and_timestamp(file).await? {
-            Some((code, timestamp)) => Ok((Encoding::ZCode(code), timestamp)),
+        match self.data_info_mgr.get_encoding_and_timestamp(&file).await? {
+            Some((encoding, timestamp)) => Ok((encoding, timestamp)),
             None => {
                 trace!("data-info for {:?} not found; fallback to metadata", file);
-                // fallback: guess mime type from file extension
-                let mime_type = mime_guess::from_path(&file).first_or_octet_stream();
-                let mime_str = mime_type.essence_str();
-                trace!("Found mime-type {} for {:?}", mime_type, file);
-                // transform mime type into zenoh encoding flag if possible
-                let encoding = match encoding::from_str(mime_str) {
-                    Ok(code) => Encoding::ZCode(code),
-                    Err(_) => {
-                        if self.keep_mime {
-                            // keep mime type
-                            Encoding::Mime(mime_str.into())
-                        } else {
-                            // drop mime type, consider payload as octets stream
-                            Encoding::ZCode(encoding::APP_OCTET_STREAM)
-                        }
-                    }
-                };
-
+                let encoding = self.guess_encoding(file);
                 // fallback: get timestamp from file's metadata
                 let timestamp = self.get_timestamp_from_metadata(file)?;
 
                 Ok((encoding, timestamp))
             }
+        }
+    }
+
+    fn guess_encoding(&self, file: &Path) -> Encoding {
+        if self.keep_mime {
+            // fallback: guess mime type from file extension
+            let mime_type = mime_guess::from_path(&file).first_or_octet_stream();
+            Encoding::from(mime_type.essence_str().to_string())
+        } else {
+            Encoding::APP_OCTET_STREAM
         }
     }
 
@@ -315,13 +357,11 @@ impl FilesMgr {
 
     fn get_timestamp_from_metadata<P: AsRef<Path>>(&self, file: P) -> ZResult<Timestamp> {
         let metadata = metadata(&file).map_err(|e| {
-            zerror2!(ZErrorKind::Other {
-                descr: format!(
-                    "Failed to get meta-data for file {:?}: {}",
-                    file.as_ref(),
-                    e
-                )
-            })
+            zerror!(
+                "Failed to get meta-data for file {:?}: {}",
+                file.as_ref(),
+                e
+            )
         })?;
         let sys_time = metadata
             .modified()
@@ -400,12 +440,12 @@ impl<'a> Iterator for FilesIterator<'a> {
                     } else {
                         let fspath = e.into_path();
                         if let Some(s) = fspath.to_str() {
-                            // zpath is the file's absolute path stripped from base_dir and converted as zenoh path
-                            // note: force owning to not have fspath borrowed
-                            let zpath =
-                                Cow::from(fspath_to_zpath(&s[self.base_dir_len..]).into_owned());
+                            // coarse_zpath is the file's absolute path stripped from base_dir and converted as zenoh path
+                            let coarse_zpath = fspath_to_zpath(&s[self.base_dir_len..]);
+                            // zpath trims away the CONFLICT_SUFFIX if present
+                            let zpath = Cow::from(get_trimmed_keyexpr(&coarse_zpath));
                             // convert it to zenoh path for matching test with zpath_expr
-                            if resource_name::intersect(zpath.as_ref(), self.zpath_expr) {
+                            if key_expr::intersect(&zpath, self.zpath_expr) {
                                 // matching file; return a ZFile
                                 let zfile = ZFile {
                                     zpath,
@@ -465,4 +505,19 @@ fn is_symlink<P: AsRef<Path>>(path: P) -> bool {
         Ok(metadata) => metadata.file_type().is_symlink(),
         Err(_) => false,
     }
+}
+
+pub(crate) fn get_trimmed_keyexpr(keyexpr: &str) -> String {
+    if keyexpr.ends_with(CONFLICT_SUFFIX) {
+        keyexpr
+            .strip_suffix(CONFLICT_SUFFIX)
+            .unwrap_or(keyexpr)
+            .to_string()
+    } else {
+        keyexpr.to_string()
+    }
+}
+
+pub(crate) fn get_conflict_resolved_keyexpr(keyexpr: &str) -> String {
+    format!("{}{}", keyexpr, CONFLICT_SUFFIX)
 }

@@ -30,8 +30,8 @@ Using `curl` on the zenoh router to add backend and storages:
 curl -X PUT -H 'content-type:application/properties' http://localhost:8000/@/router/local/plugin/storages/backend/fs
 
 # Add a storage on /demo/example/** storing data in files under ${ZBACKEND_FS_ROOT}/test/ directory
-# We use 'path_prefix=/demo/example' thus a zenoh path "/demo/example/a/b" will be stored as "${ZBACKEND_FS_ROOT}/test/a/b"
-curl -X PUT -H 'content-type:application/properties' -d "path_expr=/demo/example/**;path_prefix=/demo/example;dir=test" http://localhost:8000/@/router/local/plugin/storages/backend/fs/storage/example
+# We use 'key_prefix=/demo/example' thus a zenoh key "/demo/example/a/b" will be stored as "${ZBACKEND_FS_ROOT}/test/a/b"
+curl -X PUT -H 'content-type:application/properties' -d "key_expr=/demo/example/**;key_prefix=/demo/example;dir=test" http://localhost:8000/@/router/local/plugin/storages/backend/fs/storage/example
 
 # Put values that will be stored under ${ZBACKEND_FS_ROOT}/test
 curl -X PUT -d "TEST-1" http://localhost:8000/demo/example/test-1
@@ -42,7 +42,7 @@ curl http://localhost:8000/demo/example/**
 
 # Add a storage that will expose the same files than an Apache HTTP server, in read-only mode
 # this assumes that ${ZBACKEND_FS_ROOT} is set to the Apache DocumentRoot (e.g. "/usr/web")
-curl -X PUT -H 'content-type:application/properties' -d "path_expr=/www.test.org/**;path_prefix=/www.test.org;dir=test.org;read_only" http://localhost:8000/@/router/local/plugin/storages/backend/fs/storage/test.org
+curl -X PUT -H 'content-type:application/properties' -d "key_expr=/www.test.org/**;key_prefix=/www.test.org;dir=test.org;read_only" http://localhost:8000/@/router/local/plugin/storages/backend/fs/storage/test.org
 ```
 
 Alternatively, you can test the zenoh router in a Docker container:
@@ -65,10 +65,10 @@ Alternatively, you can test the zenoh router in a Docker container:
 -------------------------------
 ## **Properties for Storage creation**
 
-- **`"path_expr"`** (**required**) : the Storage's [Path Expression](../abstractions#path-expression)
+- **`"key_expr"`** (**required**) : the Storage's [Key Expression](../abstractions#key-expression)
 
-- **`"path_prefix"`** (**required**) : a prefix of the `"path_expr"` that will be stripped from each path to store.  
-  _Example: with `"path_expr"="/demo/example/**"` and `"path_prefix"="/demo/example/"` the path `"/demo/example/foo/bar"` will be stored as key: `"foo/bar"`. But replying to a get on `"/demo/**"`, the key `"foo/bar"` will be transformed back to the original path (`"/demo/example/foo/bar"`)._
+- **`"key_prefix"`** (**required**) : a prefix of the `"key_expr"` that will be stripped from each key to store.  
+  _Example: with `"key_expr"="/demo/example/**"` and `"key_prefix"="/demo/example/"` the value with key `"/demo/example/foo/bar"` will be stored as file: `"foo/bar"`. But replying to a get on `"/demo/**"`, the file path `"foo/bar"` will be transformed back to the original key (`"/demo/example/foo/bar"`)._
 
 - **`"dir"`** (**required**) : The directory that will be used to store
 
@@ -95,16 +95,16 @@ Each **storage** will map to a directory with path: `${ZBACKEND_FS_ROOT}/<dir>`,
      If this variable is not specified `${ZENOH_HOME}/zbackend_fs` will be used
      (where the default value of `${ZENOH_HOME}` is `~/.zenoh`).
   * `<dir>` is the `"dir"` property specified at storage creation.
-Each zenoh **path/value** put into the storage will map to a file within the storage's directory where:
-  * the file path will be `${ZBACKEND_FS_ROOT}/<dir>/<relative_zenoh_path>`, where `<relative_zenoh_path>``
-    will be the zenoh path, stripped from the `"path_prefix"` property specified at storage creation.
+Each zenoh **key/value** put into the storage will map to a file within the storage's directory where:
+  * the file path will be `${ZBACKEND_FS_ROOT}/<dir>/<relative_zenoh_key>`, where `<relative_zenoh_key>`
+    will be the zenoh key, stripped from the `"key_prefix"` property specified at storage creation.
   * the content of the file will be the value written as a RawValue. I.e. the same bytes buffer that has been
     transported by zenoh. For UTF-8 compatible formats (StringUTF8, JSon, Integer, Float...) it means the file
     will be readable as a text format.
- * the encoding and the timestamp of the key/value will be stored in a RocksDB database stored in the storage directory.
+  * the encoding and the timestamp of the key/value will be stored in a RocksDB database stored in the storage directory.
 
 ### Behaviour on deletion
-On deletion of a path, the corresponding file is removed. An entry with deletion timestamp is inserted in the
+On deletion of a key, the corresponding file is removed. An entry with deletion timestamp is inserted in the
 RocksDB database (to avoid re-insertion of points with an older timestamp in case of un-ordered messages).  
 At regular interval, a task cleans-up the RocksDB database from entries with old timestamps that don't have a
 corresponding existing file.
