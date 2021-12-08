@@ -106,10 +106,10 @@ impl Backend for FileSystemBackend {
 
     async fn create_storage(&mut self, mut config: StorageConfig) -> ZResult<Box<dyn Storage>> {
         let path_expr = config.key_expr.clone();
-        let path_prefix = config.truncate.clone();
+        let path_prefix = config.strip_prefix.clone();
         if !path_expr.starts_with(&path_prefix) {
             bail!(
-                r#"The specified "truncate={}" is not a prefix of "key_expr={}""#,
+                r#"The specified "strip_prefix={}" is not a prefix of "key_expr={}""#,
                 path_prefix,
                 path_expr
             )
