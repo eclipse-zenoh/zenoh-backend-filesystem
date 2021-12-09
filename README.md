@@ -39,7 +39,7 @@ You can setup storages either at zenoh router startup via a configuration file, 
 ### **Setup via a JSON configuration file**
 
   - Create a `zenoh.json` configuration file containing:
-    ```json
+    ```json5
     {
       plugins: {
         // configuration of "storages" plugin:
