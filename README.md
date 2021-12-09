@@ -36,9 +36,9 @@ Prerequisites:
    If you don't declare it, the `~/.zenoh/zbackend_fs` directory will be used.
 
 You can setup storages either at zenoh router startup via a configuration file, either at runtime via the zenoh admin space, using for instance the REST API.
-### **Setup via a JSON configuration file**
+### **Setup via a JSON5 configuration file**
 
-  - Create a `zenoh.json` configuration file containing:
+  - Create a `zenoh.json5` configuration file containing:
     ```json5
     {
       plugins: {
@@ -59,7 +59,7 @@ You can setup storages either at zenoh router startup via a configuration file, 
     } } } } } } }
     ```
   - Run the zenoh router with:  
-    `zenohd -c zenoh.json`
+    `zenohd -c zenoh.json5`
 
 ### **Setup at runtime via `curl` commands on the admin space**
 
@@ -68,7 +68,7 @@ You can setup storages either at zenoh router startup via a configuration file, 
   - Add the "fs" backend (the "zbackend_fs" library will be loaded):  
     `curl -X PUT -H 'content-type:application/json' -d '{}' http://localhost:8000/@/router/local/config/plugins/storages/backends/fs`
   - Add the "demo" storage using the "fs" backend:  
-    `curl -X PUT -H 'content-type:application/json' -d '{"key_expr":"/demo/example/**","strip_prefix":"/demo/example","dir":"example"}' http://localhost:8000/@/router/local/config/plugins/storages/backends/fs/storages/demo`
+    `curl -X PUT -H 'content-type:application/json' -d '{key_expr:"/demo/example/**",strip_prefix:"/demo/example",dir:"example"}' http://localhost:8000/@/router/local/config/plugins/storages/backends/fs/storages/demo`
 
 ### **Tests using the REST API**
 
