@@ -14,37 +14,77 @@ See the [zenoh documentation](http://zenoh.io/docs/manual/backends/) for more de
 This backend relies on the host's file system to implement the storages.
 Its library name (without OS specific prefix and extension) that zenoh will rely on to find it and load it is **`zbackend_fs`**.
 
-:point_right: **Download:** https://download.eclipse.org/zenoh/zenoh-backend-filesystem/
+
+:point_right: **Download stable versions:** https://download.eclipse.org/zenoh/zenoh-backend-filesystem/
+
+:point_right: **Build "master" branch:** see [below](#How-to-build-it)
+
+-------------------------------
+## :warning: Documentation for previous 0.5 versions:
+The following documentation related to the version currently in development in "master" branch: 0.6.x.
+
+For previous versions see the README and code of the corresponding tagged version:
+ - [0.5.0-beta.9](https://github.com/eclipse-zenoh/zenoh-backend-filesystem/tree/0.5.0-beta.9#readme)
+ - [0.5.0-beta.8](https://github.com/eclipse-zenoh/zenoh-backend-filesystem/tree/0.5.0-beta.8#readme)
 
 -------------------------------
 ## **Examples of usage**
 
 Prerequisites:
- - You have a zenoh router running, and the `zbackend_fs` library file is available in `~/.zenoh/lib`.
+ - You have a zenoh router (`zenohd`) installed, and the `zbackend_fs` library file is available in `~/.zenoh/lib`.
  - Declare the `ZBACKEND_FS_ROOT` environment variable to the directory where you want the files to be stored (or exposed from).
    If you don't declare it, the `~/.zenoh/zbackend_fs` directory will be used.
 
-Using `curl` on the zenoh router to add backend and storages:
+You can setup storages either at zenoh router startup via a configuration file, either at runtime via the zenoh admin space, using for instance the REST API.
+### **Setup via a JSON configuration file**
+
+  - Create a `zenoh.json` configuration file containing:
+    ```json
+    {
+      plugins: {
+        // configuration of "storages" plugin:
+        storages: {
+          backends: {
+            // configuration of a "fs" backend (the "zbackend_fs" library will be loaded at startup)
+            fs: {
+              storages: {
+                // configuration of a "demo" storage using the "fs" backend
+                demo: {
+                  // the key expression this storage will subscribes to
+                  key_expr: "/demo/example/**",
+                  // this prefix will be stripped from the received key when converting to file path
+                  strip_prefix: "/demo/example",
+                  // the key/values will be stored as files within this directory (relative to ${ZBACKEND_FS_ROOT})
+                  dir: "example"
+    } } } } } } }
+    ```
+  - Run the zenoh router with:  
+    `zenohd -c zenoh.json`
+
+### **Setup at runtime via `curl` commands on the admin space**
+
+  - Run the zenoh router without any specific configuration, but loading the storages plugin:  
+    `zenohd -P storages`
+  - Add the "fs" backend (the "zbackend_fs" library will be loaded):  
+    `curl -X PUT -H 'content-type:application/json' -d '{}' http://localhost:8000/@/router/local/config/plugins/storages/backends/fs`
+  - Add the "demo" storage using the "fs" backend:  
+    `curl -X PUT -H 'content-type:application/json' -d '{"key_expr":"/demo/example/**","strip_prefix":"/demo/example","dir":"example"}' http://localhost:8000/@/router/local/config/plugins/storages/backends/fs/storages/demo`
+
+### **Tests using the REST API**
+
+Using `curl` to publish and query keys/values, you can:
 ```bash
-# Add a backend that will have all its storages storing data in subdirectories of ${ZBACKEND_FS_ROOT} directory.
-curl -X PUT -H 'content-type:application/properties' http://localhost:8000/@/router/local/plugin/storages/backend/fs
-
-# Add a storage on /demo/example/** storing data in files under ${ZBACKEND_FS_ROOT}/test/ directory
-# We use 'key_prefix=/demo/example' thus a zenoh key "/demo/example/a/b" will be stored as "${ZBACKEND_FS_ROOT}/test/a/b"
-curl -X PUT -H 'content-type:application/properties' -d "key_expr=/demo/example/**;key_prefix=/demo/example;dir=test" http://localhost:8000/@/router/local/plugin/storages/backend/fs/storage/example
-
-# Put values that will be stored under ${ZBACKEND_FS_ROOT}/test
+# Put values that will be stored under ${ZBACKEND_FS_ROOT}/example
 curl -X PUT -d "TEST-1" http://localhost:8000/demo/example/test-1
 curl -X PUT -d "B" http://localhost:8000/demo/example/a/b
 
 # Retrive the values
 curl http://localhost:8000/demo/example/**
-
-# Add a storage that will expose the same files than an Apache HTTP server, in read-only mode
-# this assumes that ${ZBACKEND_FS_ROOT} is set to the Apache DocumentRoot (e.g. "/usr/web")
-curl -X PUT -H 'content-type:application/properties' -d "key_expr=/www.test.org/**;key_prefix=/www.test.org;dir=test.org;read_only" http://localhost:8000/@/router/local/plugin/storages/backend/fs/storage/test.org
 ```
 
+<!-- TODO: after release of eclipse/zenoh:0.6.0 update wrt. conf file and uncomment this:
+
+### **Usage with `eclipse/zenoh` Docker image**
 Alternatively, you can test the zenoh router in a Docker container:
  - Download the [docker-compose.yml](https://github.com/eclipse-zenoh/zenoh-backend-filesystem/blob/master/docker-compose.yml) file
  - In the same directory, create the `./zenoh_docker/lib` sub-directories and place the `libzbackend_fs.so` library
@@ -55,7 +95,7 @@ Alternatively, you can test the zenoh router in a Docker container:
    docker-compose up -d
    ```
  - Run the `curl` commands above, and explore the resulting file in `./zenoh_filesystem/test`
-
+-->
 
 -------------------------------
 ## **Properties for Backend creation**
@@ -67,8 +107,8 @@ Alternatively, you can test the zenoh router in a Docker container:
 
 - **`"key_expr"`** (**required**) : the Storage's [Key Expression](../abstractions#key-expression)
 
-- **`"key_prefix"`** (**required**) : a prefix of the `"key_expr"` that will be stripped from each key to store.  
-  _Example: with `"key_expr"="/demo/example/**"` and `"key_prefix"="/demo/example/"` the value with key `"/demo/example/foo/bar"` will be stored as file: `"foo/bar"`. But replying to a get on `"/demo/**"`, the file path `"foo/bar"` will be transformed back to the original key (`"/demo/example/foo/bar"`)._
+- **`"strip_prefix"`** (**required**) : a prefix of the `"key_expr"` that will be stripped from each key to store.  
+  _Example: with `"key_expr"="/demo/example/**"` and `"strip_prefix"="/demo/example/"` the value with key `"/demo/example/foo/bar"` will be stored as file: `"foo/bar"`. But replying to a get on `"/demo/**"`, the file path `"foo/bar"` will be transformed back to the original key (`"/demo/example/foo/bar"`)._
 
 - **`"dir"`** (**required**) : The directory that will be used to store
 
@@ -97,7 +137,7 @@ Each **storage** will map to a directory with path: `${ZBACKEND_FS_ROOT}/<dir>`,
   * `<dir>` is the `"dir"` property specified at storage creation.
 Each zenoh **key/value** put into the storage will map to a file within the storage's directory where:
   * the file path will be `${ZBACKEND_FS_ROOT}/<dir>/<relative_zenoh_key>`, where `<relative_zenoh_key>`
-    will be the zenoh key, stripped from the `"key_prefix"` property specified at storage creation.
+    will be the zenoh key, stripped from the `"strip_prefix"` property specified at storage creation.
   * the content of the file will be the value written as a RawValue. I.e. the same bytes buffer that has been
     transported by zenoh. For UTF-8 compatible formats (StringUTF8, JSon, Integer, Float...) it means the file
     will be readable as a text format.
@@ -130,15 +170,13 @@ To know the Rust version you're `zenohd` has been built with, use the `--version
 Example:
 ```bash
 $ zenohd --version
-The zenoh router v0.5.0-beta.5-134-g81e85d7 built with rustc 1.51.0-nightly (2987785df 2020-12-28)
+The zenoh router v0.6.0-dev-24-g1f20c86 built with rustc 1.57.0 (f1edd0429 2021-11-29)
 ```
-Here, `zenohd` has been built with the rustc version `1.51.0-nightly` built on 2020-12-28.  
-A nightly build of rustc is included in the **Rustup** nightly toolchain the day after.
-Thus you'll need to install to toolchain **`nightly-2020-12-29`**
+Here, `zenohd` has been built with the rustc version `1.57.0`.  
 Install and use this toolchain with the following command:
 
 ```bash
-$ rustup default nightly-2020-12-29
+$ rustup default 1.57.0
 ```
 
 And then build the backend with:
