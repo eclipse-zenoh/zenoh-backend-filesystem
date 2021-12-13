@@ -2891,8 +2891,8 @@ dependencies = [
 
 [[package]]
 name = "zenoh"
-version = "0.6.0-dev"
-source = "git+https://github.com/eclipse-zenoh/zenoh#f2fe7806118e058dfeda85accd3f256cc665646e"
+version = "0.6.0-dev.0"
+source = "git+https://github.com/eclipse-zenoh/zenoh#238063db9ca2e67b2213c72873b2f38981289c1c"
 dependencies = [
  "async-global-executor",
  "async-rustls",
@@ -2939,8 +2939,8 @@ dependencies = [
 
 [[package]]
 name = "zenoh-macros"
-version = "0.6.0-dev"
-source = "git+https://github.com/eclipse-zenoh/zenoh#f2fe7806118e058dfeda85accd3f256cc665646e"
+version = "0.6.0-dev.0"
+source = "git+https://github.com/eclipse-zenoh/zenoh#238063db9ca2e67b2213c72873b2f38981289c1c"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2950,8 +2950,8 @@ dependencies = [
 
 [[package]]
 name = "zenoh-plugin-trait"
-version = "0.6.0-dev"
-source = "git+https://github.com/eclipse-zenoh/zenoh#f2fe7806118e058dfeda85accd3f256cc665646e"
+version = "0.6.0-dev.0"
+source = "git+https://github.com/eclipse-zenoh/zenoh#238063db9ca2e67b2213c72873b2f38981289c1c"
 dependencies = [
  "libloading",
  "log",
@@ -2961,8 +2961,8 @@ dependencies = [
 
 [[package]]
 name = "zenoh-util"
-version = "0.6.0-dev"
-source = "git+https://github.com/eclipse-zenoh/zenoh#f2fe7806118e058dfeda85accd3f256cc665646e"
+version = "0.6.0-dev.0"
+source = "git+https://github.com/eclipse-zenoh/zenoh#238063db9ca2e67b2213c72873b2f38981289c1c"
 dependencies = [
  "aes 0.7.5",
  "anyhow",
@@ -3016,8 +3016,8 @@ dependencies = [
 
 [[package]]
 name = "zenoh_backend_traits"
-version = "0.6.0-dev"
-source = "git+https://github.com/eclipse-zenoh/zenoh#f2fe7806118e058dfeda85accd3f256cc665646e"
+version = "0.6.0-dev.0"
+source = "git+https://github.com/eclipse-zenoh/zenoh#238063db9ca2e67b2213c72873b2f38981289c1c"
 dependencies = [
  "async-std",
  "async-trait",

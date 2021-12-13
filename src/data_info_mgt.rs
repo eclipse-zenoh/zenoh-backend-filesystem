@@ -55,7 +55,7 @@ impl DataInfoMgr {
         let db = Arc::new(Mutex::new(db));
 
         // start periodic GC event
-        let timer = Timer::new();
+        let timer = Timer::default();
         let gc = TimedEvent::periodic(*GC_PERIOD, GarbageCollectionEvent { db: db.clone() });
         let _ = timer.add_async(gc).await;
 
