@@ -61,12 +61,29 @@ pub fn create_backend(_unused: BackendConfig) -> ZResult<Box<dyn Backend>> {
     let _ = env_logger::try_init();
     debug!("FileSystem backend {}", LONG_VERSION.as_str());
 
-    let root = if let Some(dir) = std::env::var_os(SCOPE_ENV_VAR) {
+    let root_path = if let Some(dir) = std::env::var_os(SCOPE_ENV_VAR) {
         PathBuf::from(dir)
     } else {
         let mut dir = PathBuf::from(zenoh_home());
         dir.push(DEFAULT_ROOT_DIR);
         dir
+    };
+    if let Err(e) = std::fs::create_dir_all(&root_path) {
+        bail!(
+            r#"Failed to create directory ${{{}}}={}: {}"#,
+            SCOPE_ENV_VAR,
+            root_path.display(),
+            e
+        );
+    }
+    let root = match root_path.canonicalize() {
+        Ok(dir) => dir,
+        Err(e) => bail!(
+            r#"Invalid path for ${{{}}}={}: {}"#,
+            SCOPE_ENV_VAR,
+            root_path.display(),
+            e
+        ),
     };
     debug!("Using root dir: {}", root.display());
 
@@ -132,9 +149,30 @@ impl Backend for FileSystemBackend {
 
         let base_dir =
             if let Some(serde_json::Value::String(dir)) = config.rest.get(PROP_STORAGE_DIR) {
+                log::error!("dir={}, root={}", dir, self.root.display());
+                let dir_path = PathBuf::from(dir.as_str());
+                if dir_path.is_absolute() {
+                    bail!(
+                        r#"Invalid property "{}"="{}": the path must be relative"#,
+                        PROP_STORAGE_DIR,
+                        dir
+                    );
+                }
+                if dir_path
+                    .components()
+                    .any(|c| c == std::path::Component::ParentDir)
+                {
+                    bail!(
+                        r#"Invalid property "{}"="{}": the path must not contain any '..'"#,
+                        PROP_STORAGE_DIR,
+                        dir
+                    );
+                }
+
                 // prepend base_dir with self.root
                 let mut base_dir = self.root.clone();
-                base_dir.push(dir);
+                base_dir.push(dir_path);
+                log::error!("base_dir={}", base_dir.display());
                 base_dir
             } else {
                 bail!(
