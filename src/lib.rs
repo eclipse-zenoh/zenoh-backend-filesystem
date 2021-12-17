@@ -91,12 +91,16 @@ pub fn create_backend(_unused: BackendConfig) -> ZResult<Box<dyn Backend>> {
     properties.insert("root".into(), root.to_string_lossy().into());
     properties.insert("version".into(), LONG_VERSION.clone());
 
-    let admin_status = zenoh::properties::properties_to_json_value(&properties);
+    let admin_status = properties
+        .0
+        .into_iter()
+        .map(|(k, v)| (k, serde_json::Value::String(v)))
+        .collect();
     Ok(Box::new(FileSystemBackend { admin_status, root }))
 }
 
 pub struct FileSystemBackend {
-    admin_status: Value,
+    admin_status: serde_json::Value,
     root: PathBuf,
 }
 
@@ -117,7 +121,7 @@ fn extract_bool(
 
 #[async_trait]
 impl Backend for FileSystemBackend {
-    async fn get_admin_status(&self) -> Value {
+    fn get_admin_status(&self) -> serde_json::Value {
         self.admin_status.clone()
     }
 
@@ -283,8 +287,8 @@ impl FileSystemStorage {
 
 #[async_trait]
 impl Storage for FileSystemStorage {
-    async fn get_admin_status(&self) -> Value {
-        self.admin_status.to_json_value().into()
+    fn get_admin_status(&self) -> serde_json::Value {
+        self.admin_status.to_json_value()
     }
 
     // When receiving a Sample (i.e. on PUT or DELETE operations)
