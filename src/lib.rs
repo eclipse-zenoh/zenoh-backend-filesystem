@@ -126,15 +126,14 @@ impl Backend for FileSystemBackend {
     }
 
     async fn create_storage(&mut self, mut config: StorageConfig) -> ZResult<Box<dyn Storage>> {
-        let path_expr = config.key_expr.clone();
-        let path_prefix = config.strip_prefix.clone();
-        if !path_expr.starts_with(&path_prefix) {
+        if !config.key_expr.starts_with(&config.strip_prefix) {
             bail!(
                 r#"The specified "strip_prefix={}" is not a prefix of "key_expr={}""#,
-                path_prefix,
-                path_expr
+                config.strip_prefix,
+                config.key_expr
             )
         }
+        let path_prefix = config.strip_prefix.clone();
 
         let read_only = extract_bool(&config.rest, PROP_STORAGE_READ_ONLY, false)?;
         let follow_links = extract_bool(&config.rest, PROP_STORAGE_FOLLOW_LINK, false)?;
@@ -153,7 +152,6 @@ impl Backend for FileSystemBackend {
 
         let base_dir =
             if let Some(serde_json::Value::String(dir)) = config.rest.get(PROP_STORAGE_DIR) {
-                log::error!("dir={}, root={}", dir, self.root.display());
                 let dir_path = PathBuf::from(dir.as_str());
                 if dir_path.is_absolute() {
                     bail!(
@@ -176,7 +174,6 @@ impl Backend for FileSystemBackend {
                 // prepend base_dir with self.root
                 let mut base_dir = self.root.clone();
                 base_dir.push(dir_path);
-                log::error!("base_dir={}", base_dir.display());
                 base_dir
             } else {
                 bail!(
@@ -225,8 +222,13 @@ impl Backend for FileSystemBackend {
             .rest
             .insert("dir_full_path".into(), base_dir.to_string_lossy().into());
 
-        let files_mgr = FilesMgr::new(base_dir, follow_links, keep_mime, on_closure).await?;
+        log::debug!(
+            "Storage on {} will store files in {}",
+            config.key_expr,
+            base_dir.display()
+        );
 
+        let files_mgr = FilesMgr::new(base_dir, follow_links, keep_mime, on_closure).await?;
         Ok(Box::new(FileSystemStorage {
             admin_status: config,
             path_prefix,
