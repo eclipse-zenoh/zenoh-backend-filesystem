@@ -76,7 +76,7 @@ pub fn create_backend(_unused: BackendConfig) -> ZResult<Box<dyn Backend>> {
             e
         );
     }
-    let root = match root_path.canonicalize() {
+    let root = match dunce::canonicalize(&root_path) {
         Ok(dir) => dir,
         Err(e) => bail!(
             r#"Invalid path for ${{{}}}={}: {}"#,
