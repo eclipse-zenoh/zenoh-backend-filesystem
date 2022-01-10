@@ -42,6 +42,10 @@ You can setup storages either at zenoh router startup via a configuration file, 
     ```json5
     {
       plugins: {
+        // configuration of "rest" plugin:
+        rest: {
+          http_port: 8000
+        },
         // configuration of "storages" plugin:
         storages: {
           backends: {
