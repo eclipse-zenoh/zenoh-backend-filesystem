@@ -23,7 +23,8 @@ use zenoh::{prelude::*, time::new_reception_timestamp};
 use zenoh_backend_traits::{
     config::BackendConfig, config::StorageConfig, utils, Backend, CreateBackend, Query, Storage,
 };
-use zenoh_util::{bail, zenoh_home, zerror};
+use zenoh_core::{bail, zerror};
+use zenoh_util::zenoh_home;
 
 mod data_info_mgt;
 mod files_mgt;
