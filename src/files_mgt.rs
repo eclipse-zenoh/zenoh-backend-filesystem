@@ -26,7 +26,7 @@ use zenoh::prelude::*;
 use zenoh::time::{Timestamp, TimestampId};
 use zenoh::utils::key_expr;
 use zenoh::Result as ZResult;
-use zenoh_util::{bail, zerror};
+use zenoh_core::{bail, zerror};
 
 use crate::data_info_mgt::*;
 

@@ -21,8 +21,8 @@ use zenoh::buf::{WBuf, ZBuf};
 use zenoh::prelude::*;
 use zenoh::time::{Timestamp, NTP64};
 use zenoh::Result as ZResult;
+use zenoh_core::{bail, zerror};
 use zenoh_util::collections::{Timed, TimedEvent, Timer};
-use zenoh_util::{bail, zerror};
 
 lazy_static::lazy_static! {
     static ref GC_PERIOD: Duration = Duration::new(30, 0);
