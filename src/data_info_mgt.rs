@@ -21,6 +21,7 @@ use zenoh::buf::{WBuf, ZBuf};
 use zenoh::prelude::*;
 use zenoh::time::{Timestamp, NTP64};
 use zenoh::Result as ZResult;
+use zenoh_buffers::reader::HasReader;
 use zenoh_collections::{Timed, TimedEvent, Timer};
 use zenoh_core::{bail, zerror};
 
@@ -156,7 +157,8 @@ impl DataInfoMgr {
 }
 
 fn decode_encoding_timestamp_from_value(val: &[u8]) -> ZResult<(Encoding, Timestamp)> {
-    let mut buf = ZBuf::from(val.to_vec());
+    let buf = ZBuf::from(val.to_vec());
+    let mut buf = buf.reader();
     let timestamp = buf
         .read_timestamp()
         .ok_or_else(|| zerror!("Failed to decode data-info (timestamp)"))?;
@@ -176,7 +178,8 @@ fn decode_encoding_timestamp_from_value(val: &[u8]) -> ZResult<(Encoding, Timest
 }
 
 fn decode_timestamp_from_value(val: &[u8]) -> ZResult<Timestamp> {
-    let mut buf = ZBuf::from(val.to_vec());
+    let buf = ZBuf::from(val.to_vec());
+    let mut buf = buf.reader();
     let timestamp = buf
         .read_timestamp()
         .ok_or_else(|| zerror!("Failed to decode data-info (timestamp)"))?;

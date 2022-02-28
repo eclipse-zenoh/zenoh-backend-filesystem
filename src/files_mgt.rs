@@ -26,6 +26,7 @@ use zenoh::prelude::*;
 use zenoh::time::{Timestamp, TimestampId};
 use zenoh::utils::key_expr;
 use zenoh::Result as ZResult;
+use zenoh_buffers::traits::SplitBuffer;
 use zenoh_core::{bail, zerror};
 
 use crate::data_info_mgt::*;
@@ -159,8 +160,8 @@ impl FilesMgr {
         trace!("Writing in conflict-free file {:?}", file);
         let mut f = File::create(&file)
             .map_err(|e| zerror!("Failed to write in file {:?}: {}", file, e))?;
-        for slice in content {
-            f.write_all(slice.as_slice())
+        for slice in content.slices() {
+            f.write_all(slice)
                 .map_err(|e| zerror!("Failed to write in file {:?}: {}", file, e))?;
         }
 
