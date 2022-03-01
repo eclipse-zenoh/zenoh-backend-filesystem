@@ -129,14 +129,13 @@ impl FilesMgr {
                     a,
                     conflict_file
                 );
-                rename(a, conflict_file.to_path_buf())
+                rename(a, &conflict_file)
                     .map_err(|e| zerror!("Failed to write in file {:?}: {}", conflict_file, e))?;
                 match self.data_info_mgr.rename_key(a, &conflict_file).await {
                     Ok(_) => None,
                     Err(_) => {
                         // fallback: get encoding and timestamp from file's metadata
-                        let (a_encoding, a_timestamp) =
-                            self.generate_metadata(&a.to_path_buf(), timestamp);
+                        let (a_encoding, a_timestamp) = self.generate_metadata(a, timestamp);
                         self.data_info_mgr
                             .put_data_info(file, &a_encoding, &a_timestamp)
                             .await
@@ -194,8 +193,7 @@ impl FilesMgr {
         // Delete file
         trace!("Delete file {:?}", file);
         if file.exists() {
-            remove_file(file.to_path_buf())
-                .map_err(|e| zerror!("Failed to delete file {:?}: {}", file, e))?;
+            remove_file(&file).map_err(|e| zerror!("Failed to delete file {:?}: {}", file, e))?;
             // try to delete parent directories if empty
             let mut f = file.as_path();
             while let Some(parent) = f.parent() {
@@ -219,7 +217,7 @@ impl FilesMgr {
     // Otherwise, the encoding is guessed from the file extension, and the timestamp is computed from the file's time.
     pub(crate) async fn read_file(&self, zfile: &ZFile<'_>) -> ZResult<Option<(Value, Timestamp)>> {
         let file = &zfile.fspath;
-        match self.perform_read(&file.to_path_buf()).await? {
+        match self.perform_read(file).await? {
             Some(x) => Ok(Some(x)),
             None => self.perform_read_from_conflict(file.to_path_buf()).await,
         }
@@ -247,7 +245,7 @@ impl FilesMgr {
                             bail!(r#"Error reading file {:?}: {}"#, file, e)
                         } else {
                             let (encoding, timestamp) =
-                                self.get_encoding_and_timestamp(&file.to_path_buf()).await?;
+                                self.get_encoding_and_timestamp(file).await?;
                             Ok(Some((
                                 Value {
                                     payload: content.into(),
