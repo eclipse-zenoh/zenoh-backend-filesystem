@@ -15,6 +15,7 @@ use async_std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use log::{trace, warn};
 use rocksdb::{IteratorMode, DB};
+use std::convert::TryInto;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use zenoh::buf::{WBuf, ZBuf};
@@ -82,8 +83,8 @@ impl DataInfoMgr {
         let mut value: WBuf = WBuf::new(32, true);
         // note: encode timestamp at first for faster decoding when only this one is required
         let write_ok = value.write_timestamp(timestamp)
-            && value.write_zint(encoding.prefix)
-            && value.write_string(&encoding.suffix);
+            && value.write_zint(u8::from(*encoding.prefix()).into())
+            && value.write_string(encoding.suffix());
         if !write_ok {
             bail!("Failed to encode data-info for {:?}", file.as_ref())
         } else {
@@ -168,13 +169,15 @@ fn decode_encoding_timestamp_from_value(val: &[u8]) -> ZResult<(Encoding, Timest
     let encoding_suffix = buf
         .read_string()
         .ok_or_else(|| zerror!("Failed to decode data-info (encoding.suffix)"))?;
-    Ok((
-        Encoding {
-            prefix: encoding_prefix,
-            suffix: encoding_suffix.into(),
-        },
-        timestamp,
-    ))
+    let encoding_prefix = encoding_prefix
+        .try_into()
+        .map_err(|_| zerror!("Unknown encoding {}", encoding_prefix))?;
+    let encoding = if encoding_suffix.is_empty() {
+        Encoding::Exact(encoding_prefix)
+    } else {
+        Encoding::WithSuffix(encoding_prefix, encoding_suffix.into())
+    };
+    Ok((encoding, timestamp))
 }
 
 fn decode_timestamp_from_value(val: &[u8]) -> ZResult<Timestamp> {
