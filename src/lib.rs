@@ -21,7 +21,7 @@ use tempfile::tempfile_in;
 use zenoh::Result as ZResult;
 use zenoh::{prelude::*, time::new_reception_timestamp};
 use zenoh_backend_traits::{
-    config::BackendConfig, config::StorageConfig, utils, Backend, CreateBackend, Query, Storage,
+    config::StorageConfig, config::VolumeConfig, utils, Backend, CreateBackend, Query, Storage,
 };
 use zenoh_core::{bail, zerror};
 use zenoh_util::zenoh_home;
@@ -56,7 +56,7 @@ lazy_static::lazy_static!(
 const CREATE_BACKEND_TYPECHECK: CreateBackend = create_backend;
 
 #[no_mangle]
-pub fn create_backend(_unused: BackendConfig) -> ZResult<Box<dyn Backend>> {
+pub fn create_backend(_unused: VolumeConfig) -> ZResult<Box<dyn Backend>> {
     // For some reasons env_logger is sometime not active in a loaded library.
     // Try to activate it here, ignoring failures.
     let _ = env_logger::try_init();
@@ -135,11 +135,15 @@ impl Backend for FileSystemBackend {
             )
         }
         let path_prefix = config.strip_prefix.clone();
+        let volume_cfg = match config.volume_cfg.as_object() {
+            Some(v) => v,
+            None => bail!("fs backed volumes require volume-specific configuration"),
+        };
 
-        let read_only = extract_bool(&config.rest, PROP_STORAGE_READ_ONLY, false)?;
-        let follow_links = extract_bool(&config.rest, PROP_STORAGE_FOLLOW_LINK, false)?;
-        let keep_mime = extract_bool(&config.rest, PROP_STORAGE_KEEP_MIME, true)?;
-        let on_closure = match config.rest.get(PROP_STORAGE_ON_CLOSURE) {
+        let read_only = extract_bool(volume_cfg, PROP_STORAGE_READ_ONLY, false)?;
+        let follow_links = extract_bool(volume_cfg, PROP_STORAGE_FOLLOW_LINK, false)?;
+        let keep_mime = extract_bool(volume_cfg, PROP_STORAGE_KEEP_MIME, true)?;
+        let on_closure = match config.volume_cfg.get(PROP_STORAGE_ON_CLOSURE) {
             Some(serde_json::Value::String(s)) if s == "delete_all" => OnClosure::DeleteAll,
             Some(serde_json::Value::String(s)) if s == "do_nothing" => OnClosure::DoNothing,
             None => OnClosure::DoNothing,
@@ -152,7 +156,7 @@ impl Backend for FileSystemBackend {
         };
 
         let base_dir =
-            if let Some(serde_json::Value::String(dir)) = config.rest.get(PROP_STORAGE_DIR) {
+            if let Some(serde_json::Value::String(dir)) = config.volume_cfg.get(PROP_STORAGE_DIR) {
                 let dir_path = PathBuf::from(dir.as_str());
                 if dir_path.is_absolute() {
                     bail!(
@@ -220,7 +224,9 @@ impl Backend for FileSystemBackend {
         }
 
         config
-            .rest
+            .volume_cfg
+            .as_object_mut()
+            .unwrap()
             .insert("dir_full_path".into(), base_dir.to_string_lossy().into());
 
         log::debug!(
