@@ -46,33 +46,41 @@ You can setup storages either at zenoh router startup via a configuration file, 
         rest: {
           http_port: 8000
         },
-        // configuration of "storages" plugin:
-        storages: {
-          backends: {
+        // configuration of "storage-manager" plugin:
+        storage_manager: {
+          volumes: {
             // configuration of a "fs" backend (the "zbackend_fs" library will be loaded at startup)
-            fs: {
-              storages: {
-                // configuration of a "demo" storage using the "fs" backend
-                demo: {
-                  // the key expression this storage will subscribes to
-                  key_expr: "/demo/example/**",
-                  // this prefix will be stripped from the received key when converting to file path
-                  strip_prefix: "/demo/example",
-                  // the key/values will be stored as files within this directory (relative to ${ZBACKEND_FS_ROOT})
-                  dir: "example"
-    } } } } } } }
+            fs: {}
+          },
+          storages: {
+            // configuration of a "demo" storage using the "fs" backend
+            demo: {
+              // the key expression this storage will subscribes to
+              key_expr: "/demo/example/**",
+              // this prefix will be stripped from the received key when converting to file path
+              strip_prefix: "/demo/example",
+              // the key/values will be stored as files within this directory (relative to ${ZBACKEND_FS_ROOT})
+              volume: {
+                id: "fs",
+                dir: "example"
+              }
+            }
+          } 
+      }
+    }
+  }
     ```
   - Run the zenoh router with:  
     `zenohd -c zenoh.json5`
 
 ### **Setup at runtime via `curl` commands on the admin space**
 
-  - Run the zenoh router without any specific configuration, but loading the storages plugin:  
-    `zenohd -P storages`
+  - Run the zenoh router:
+    `zenohd`
   - Add the "fs" backend (the "zbackend_fs" library will be loaded):  
-    `curl -X PUT -H 'content-type:application/json' -d '{}' http://localhost:8000/@/router/local/config/plugins/storages/backends/fs`
+    `curl -X PUT -H 'content-type:application/json' -d '{}' http://localhost:8000/@/router/local/config/plugins/storage_manager/volumes/fs`
   - Add the "demo" storage using the "fs" backend:  
-    `curl -X PUT -H 'content-type:application/json' -d '{key_expr:"/demo/example/**",strip_prefix:"/demo/example",dir:"example"}' http://localhost:8000/@/router/local/config/plugins/storages/backends/fs/storages/demo`
+    `curl -X PUT -H 'content-type:application/json' -d '{key_expr:"/demo/example/**",strip_prefix:"/demo/example", volume: {id: "fs", dir:"example"}}' http://localhost:8000/@/router/local/config/plugins/storages/storages/demo`
 
 ### **Tests using the REST API**
 
