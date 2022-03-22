@@ -21,7 +21,7 @@ use tempfile::tempfile_in;
 use zenoh::Result as ZResult;
 use zenoh::{prelude::*, time::new_reception_timestamp};
 use zenoh_backend_traits::{
-    config::StorageConfig, config::VolumeConfig, utils, Backend, CreateBackend, Query, Storage,
+    config::StorageConfig, config::VolumeConfig, utils, CreateVolume, Query, Storage, Volume,
 };
 use zenoh_core::{bail, zerror};
 use zenoh_util::zenoh_home;
@@ -53,10 +53,10 @@ lazy_static::lazy_static!(
 
 #[allow(dead_code)]
 /// Serves as typecheck for the create_backend function, ensuring it has the expected signature
-const CREATE_BACKEND_TYPECHECK: CreateBackend = create_backend;
+const CREATE_VOLUME_TYPECHECK: CreateVolume = create_volume;
 
 #[no_mangle]
-pub fn create_backend(_unused: VolumeConfig) -> ZResult<Box<dyn Backend>> {
+pub fn create_volume(_unused: VolumeConfig) -> ZResult<Box<dyn Volume>> {
     // For some reasons env_logger is sometime not active in a loaded library.
     // Try to activate it here, ignoring failures.
     let _ = env_logger::try_init();
@@ -121,7 +121,7 @@ fn extract_bool(
 }
 
 #[async_trait]
-impl Backend for FileSystemBackend {
+impl Volume for FileSystemBackend {
     fn get_admin_status(&self) -> serde_json::Value {
         self.admin_status.clone()
     }
