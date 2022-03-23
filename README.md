@@ -50,7 +50,8 @@ You can setup storages either at zenoh router startup via a configuration file, 
         storage_manager: {
           volumes: {
             // configuration of a "fs" backend (the "zbackend_fs" library will be loaded at startup)
-            fs: {}
+            fs: {},
+            fs2: {backend: "fs"}
           },
           storages: {
             // configuration of a "demo" storage using the "fs" backend
@@ -58,6 +59,7 @@ You can setup storages either at zenoh router startup via a configuration file, 
               // the key expression this storage will subscribes to
               key_expr: "/demo/example/**",
               // this prefix will be stripped from the received key when converting to file path
+              // this argument is optional.
               strip_prefix: "/demo/example",
               // the key/values will be stored as files within this directory (relative to ${ZBACKEND_FS_ROOT})
               volume: {
@@ -65,10 +67,10 @@ You can setup storages either at zenoh router startup via a configuration file, 
                 dir: "example"
               }
             }
-          } 
+          }
+        }
       }
     }
-  }
     ```
   - Run the zenoh router with:  
     `zenohd -c zenoh.json5`
@@ -110,32 +112,29 @@ Alternatively, you can test the zenoh router in a Docker container:
 -->
 
 -------------------------------
-## **Properties for Backend creation**
+## Configuration
+### Extra configuration for filesystem-backed volumes
 
-- **`"lib"`** (optional) : the path to the backend library file. If not speficied, the Backend identifier in admin space must be `fs` (i.e. zenoh will automatically search for a library named `zbackend_fs`).
+Volumes using the `fs` backend don't need any extra configuration at the volume level. Any volume can use the `fs` backend by specifying the value `"fs"` for the `backend` configuration key. A volume named `fs` will automatically be backed by the `fs` backend if no other backend is specified.
 
 -------------------------------
-## **Properties for Storage creation**
+### Storage-level configuration for filesystem-backed volumes
 
-- **`"key_expr"`** (**required**) : the Storage's [Key Expression](../abstractions#key-expression)
+Storages relying on a `fs` backed volume must/can specify additional configuration specific to that volume, as shown in the example [above](#setup-via-a-json5-configuration-file):
+- `dir` (**required**, string) : The directory that will be used to store data.
 
-- **`"strip_prefix"`** (**required**) : a prefix of the `"key_expr"` that will be stripped from each key to store.  
-  _Example: with `"key_expr"="/demo/example/**"` and `"strip_prefix"="/demo/example/"` the value with key `"/demo/example/foo/bar"` will be stored as file: `"foo/bar"`. But replying to a get on `"/demo/**"`, the file path `"foo/bar"` will be transformed back to the original key (`"/demo/example/foo/bar"`)._
+- `read_only` (optional, boolean) : the storage will only answer to GET queries. It will not accept any PUT or DELETE message, and won't write any file. `false` by default.
 
-- **`"dir"`** (**required**) : The directory that will be used to store
-
-- **`"read_only"`** (optional) : the storage will only answer to GET queries. It will not accept any PUT or DELETE message, and won't write any file. Not set by default. *(the value doesn't matter, only the property existence is checked)*
-
-- **`"on_closure"`** (optional) : the strategy to use when the Storage is removed. There are 2 options:
-  - *unset*: the storage's directory remains untouched (this is the default behaviour)
+- `on_closure` (optional, string) : the strategy to use when the Storage is removed. There are 2 options:
+  - `"do_nothing"`: the storage's directory remains untouched (this is the default behaviour)
   - `"delete_all"`: the storage's directory is deleted with all its content.
 
-- **`"follow_links"`** (optional) : If set to `true` the storage will follow the symbolic links. The default value is `false`.
+- `follow_links` (optional, boolean) : If set to `true` the storage will follow the symbolic links. The default value is `false`.
 
-- **`"keep_mime_types"`** (optional) : When replying to a GET query with a file for which the zenoh encoding is not known, the storage guess its mime-type according to the file extension. If the mime-type doesn't correspond to a supported zenoh encoding, this option will drive the returned value:
-   - if `true` (default value): a [Custom value](https://docs.rs/zenoh/latest/zenoh/enum.Value.html#variant.Custom)
+- `keep_mime_types` (optional, boolean) : When replying to a GET query with a file for which the zenoh encoding is not known, the storage guess its mime-type according to the file extension. If the mime-type doesn't correspond to a supported zenoh encoding, this option will drive the returned value:
+   - `true` (default value): a [Custom value](https://docs.rs/zenoh/latest/zenoh/enum.Value.html#variant.Custom)
      is returned with the description set to the mime-type.
-   - if `false`: a [Raw value](https://docs.rs/zenoh/latest/zenoh/enum.Value.html#variant.Raw) with
+   - `false`: a [Raw value](https://docs.rs/zenoh/latest/zenoh/enum.Value.html#variant.Raw) with
      APP_OCTET_STREAM encoding is returned.
 
 -------------------------------
@@ -156,12 +155,14 @@ Each zenoh **key/value** put into the storage will map to a file within the stor
   * the encoding and the timestamp of the key/value will be stored in a RocksDB database stored in the storage directory.
 
 ### Behaviour on deletion
+
 On deletion of a key, the corresponding file is removed. An entry with deletion timestamp is inserted in the
 RocksDB database (to avoid re-insertion of points with an older timestamp in case of un-ordered messages).  
 At regular interval, a task cleans-up the RocksDB database from entries with old timestamps that don't have a
 corresponding existing file.
 
 ### Behaviour on GET
+
 On GET operations, the storage searches for matching and existing files, and return their raw content as a reply.
 For each, the encoding and timestamp are retrieved from the RocksDB database. But if no entry is found in the
 database for a file (e.g. for files created without zenoh), the encoding is deduced from the file's extension
