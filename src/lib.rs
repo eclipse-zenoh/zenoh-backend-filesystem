@@ -21,7 +21,8 @@ use tempfile::tempfile_in;
 use zenoh::Result as ZResult;
 use zenoh::{prelude::*, time::new_reception_timestamp};
 use zenoh_backend_traits::{
-    config::StorageConfig, config::VolumeConfig, utils, CreateVolume, Query, Storage, Volume,
+    config::StorageConfig, config::VolumeConfig, utils, CreateVolume, Query, Storage,
+    StorageInsertionResult, Volume,
 };
 use zenoh_core::{bail, zerror};
 use zenoh_util::zenoh_home;
@@ -301,7 +302,7 @@ impl Storage for FileSystemStorage {
     }
 
     // When receiving a Sample (i.e. on PUT or DELETE operations)
-    async fn on_sample(&mut self, sample: Sample) -> ZResult<()> {
+    async fn on_sample(&mut self, sample: Sample) -> ZResult<StorageInsertionResult> {
         // strip path from "path_prefix" and converted to a ZFile
         let zfile = sample
             .key_expr
@@ -324,7 +325,7 @@ impl Storage for FileSystemStorage {
                     "{} on {} dropped: out-of-date",
                     sample.kind, sample.key_expr
                 );
-                return Ok(());
+                return Ok(StorageInsertionResult::Outdated);
             }
         }
 
@@ -340,30 +341,32 @@ impl Storage for FileSystemStorage {
                             &sample.value.encoding,
                             &sample_ts,
                         )
-                        .await
+                        .await?;
+                    Ok(StorageInsertionResult::Inserted)
                 } else {
                     warn!(
                         "Received PUT for read-only Files System Storage on {:?} - ignored",
                         self.files_mgr.base_dir()
                     );
-                    Ok(())
+                    Err("Received update for read-only File System Storage".into())
                 }
             }
             SampleKind::Delete => {
                 if !self.read_only {
                     // delete file
-                    self.files_mgr.delete_file(&zfile, &sample_ts).await
+                    self.files_mgr.delete_file(&zfile, &sample_ts).await?;
+                    Ok(StorageInsertionResult::Deleted)
                 } else {
                     warn!(
                         "Received DELETE for read-only Files System Storage on {:?} - ignored",
                         self.files_mgr.base_dir()
                     );
-                    Ok(())
+                    Err("Received update for read-only File System Storage".into())
                 }
             }
             SampleKind::Patch => {
                 warn!("Received PATCH for {}: not yet supported", sample.key_expr);
-                Ok(())
+                Err("Received update for read-only File System Storage".into())
             }
         }
     }
