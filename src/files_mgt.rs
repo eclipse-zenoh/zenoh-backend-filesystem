@@ -208,7 +208,7 @@ impl FilesMgr {
 
         // save timestamp in data-info (encoding is not used)
         self.data_info_mgr
-            .put_data_info(file, &Encoding::EMPTY, timestamp)
+            .put_data_info(file, &KnownEncoding::Empty.into(), timestamp)
             .await
     }
 
@@ -333,7 +333,7 @@ impl FilesMgr {
             let mime_type = mime_guess::from_path(&file).first_or_octet_stream();
             Encoding::from(mime_type.essence_str().to_string())
         } else {
-            Encoding::APP_OCTET_STREAM
+            KnownEncoding::AppOctetStream.into()
         }
     }
 

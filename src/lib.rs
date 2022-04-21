@@ -280,9 +280,17 @@ impl FileSystemStorage {
                 );
                 // append path_prefix to the zenoh path of this ZFile
                 let zpath = concat_str(&self.path_prefix, zfile.zpath.as_ref());
-                query
+                if let Err(e) = query
                     .reply(Sample::new(zpath, value).with_timestamp(timestamp))
-                    .await;
+                    .await
+                {
+                    warn!(
+                        "Error replying to query on {} with file {}: {}",
+                        query.selector(),
+                        zfile,
+                        e
+                    );
+                }
             }
             Ok(None) => (), // file not found, do nothing
             Err(e) => warn!(
