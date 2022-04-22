@@ -413,13 +413,16 @@ impl Storage for FileSystemStorage {
                     result.push((zpath, timestamp));
                 }
                 Ok(None) => (), // file not found, do nothing
-                Err(e) => warn!("Getting all entries : failed to read file {} : {}", zfile, e),
+                Err(e) => warn!(
+                    "Getting all entries : failed to read file {} : {}",
+                    zfile, e
+                ),
             }
         }
         // get deleted files information from rocksdb
-        for (zpath, ts) in self.files_mgr.get_deleted_entries().await{
+        for (zpath, ts) in self.files_mgr.get_deleted_entries().await {
             result.push((concat_str(&self.path_prefix, zpath), ts));
-        }        
+        }
         Ok(result)
     }
 }

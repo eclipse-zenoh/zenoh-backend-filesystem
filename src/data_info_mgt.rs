@@ -164,7 +164,8 @@ impl DataInfoMgr {
                 if !path.exists() {
                     match decode_timestamp_from_value(&value) {
                         Ok(timestamp) => {
-                            result.push((std::str::from_utf8(&key).unwrap().to_string(), timestamp));
+                            result
+                                .push((std::str::from_utf8(&key).unwrap().to_string(), timestamp));
                         }
                         Err(e) => warn!("Failed to decode data-info for file {:?}: {}", path, e),
                     }
