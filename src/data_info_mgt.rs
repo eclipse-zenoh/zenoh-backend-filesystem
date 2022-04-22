@@ -155,6 +155,24 @@ impl DataInfoMgr {
             Err(e) => bail!("Failed to get data-info for {:?}: {}", file.as_ref(), e),
         }
     }
+
+    pub async fn get_deleted_entries(&self) -> Vec<(String, Timestamp)> {
+        let mut result = Vec::new();
+        let db = self.db.lock().await;
+        for (key, value) in db.iterator(IteratorMode::Start) {
+            if let Ok(path) = std::str::from_utf8(&key).map(Path::new) {
+                if !path.exists() {
+                    match decode_timestamp_from_value(&value) {
+                        Ok(timestamp) => {
+                            result.push((std::str::from_utf8(&key).unwrap().to_string(), timestamp));
+                        }
+                        Err(e) => warn!("Failed to decode data-info for file {:?}: {}", path, e),
+                    }
+                }
+            }
+        }
+        result
+    }
 }
 
 fn decode_encoding_timestamp_from_value(val: &[u8]) -> ZResult<(Encoding, Timestamp)> {

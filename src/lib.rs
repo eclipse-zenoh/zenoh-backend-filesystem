@@ -398,6 +398,30 @@ impl Storage for FileSystemStorage {
 
         Ok(())
     }
+
+    async fn get_all_entries(&self) -> ZResult<Vec<(String, zenoh::time::Timestamp)>> {
+        let mut result = Vec::new();
+
+        // get all files in the filesystem
+        for zfile in self.files_mgr.matching_files("**") {
+            let trimmed_zpath = get_trimmed_keyexpr(zfile.zpath.as_ref());
+            let trimmed_zfile = self.files_mgr.to_zfile(&trimmed_zpath);
+            match self.files_mgr.read_file(&trimmed_zfile).await {
+                Ok(Some((_, timestamp))) => {
+                    // append path_prefix to the zenoh path of this ZFile
+                    let zpath = concat_str(&self.path_prefix, zfile.zpath.as_ref());
+                    result.push((zpath, timestamp));
+                }
+                Ok(None) => (), // file not found, do nothing
+                Err(e) => warn!("Getting all entries : failed to read file {} : {}", zfile, e),
+            }
+        }
+        // get deleted files information from rocksdb
+        for (zpath, ts) in self.files_mgr.get_deleted_entries().await{
+            result.push((concat_str(&self.path_prefix, zpath), ts));
+        }        
+        Ok(result)
+    }
 }
 
 pub(crate) fn concat_str<S1: AsRef<str>, S2: AsRef<str>>(s1: S1, s2: S2) -> String {
