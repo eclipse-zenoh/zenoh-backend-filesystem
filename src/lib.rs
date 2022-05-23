@@ -18,8 +18,10 @@ use std::io::prelude::*;
 use std::path::PathBuf;
 use std::{fs::DirBuilder, sync::Arc};
 use tempfile::tempfile_in;
+use zenoh::prelude::r#async::AsyncResolve;
+use zenoh::prelude::*;
+use zenoh::time::new_reception_timestamp;
 use zenoh::Result as ZResult;
-use zenoh::{prelude::*, time::new_reception_timestamp};
 use zenoh_backend_traits::{
     config::StorageConfig, config::VolumeConfig, utils, CreateVolume, Query, Storage,
     StorageInsertionResult, Volume,
@@ -282,6 +284,7 @@ impl FileSystemStorage {
                 let zpath = concat_str(&self.path_prefix, zfile.zpath.as_ref());
                 if let Err(e) = query
                     .reply(Sample::new(zpath, value).with_timestamp(timestamp))
+                    .res()
                     .await
                 {
                     warn!(
