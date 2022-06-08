@@ -24,7 +24,6 @@ use walkdir::{IntoIter, WalkDir};
 use zenoh::buf::ZBuf;
 use zenoh::prelude::*;
 use zenoh::time::{Timestamp, TimestampId};
-use zenoh::utils::key_expr;
 use zenoh::Result as ZResult;
 use zenoh_buffers::traits::SplitBuffer;
 use zenoh_core::{bail, zerror};
@@ -266,7 +265,7 @@ impl FilesMgr {
     }
 
     // Search for files matching path_expr.
-    pub(crate) fn matching_files<'a>(&self, zpath_expr: &'a str) -> FilesIterator<'a> {
+    pub(crate) fn matching_files<'a>(&self, zpath_expr: &'a keyexpr) -> FilesIterator<'a> {
         // find the longest segment without '*' to search for files only in the corresponding
         let star_idx = zpath_expr.find('*').unwrap();
         let segment = match zpath_expr[..star_idx].rfind('/') {
@@ -433,7 +432,7 @@ impl Drop for FilesMgr {
 
 pub(crate) struct FilesIterator<'a> {
     walk_iter: IntoIter,
-    zpath_expr: &'a str,
+    zpath_expr: &'a keyexpr,
     base_dir_len: usize,
 }
 
@@ -454,12 +453,23 @@ impl<'a> Iterator for FilesIterator<'a> {
                             // coarse_zpath is the file's absolute path stripped from base_dir and converted as zenoh path
                             let coarse_zpath = fspath_to_zpath(&s[self.base_dir_len..]);
                             // zpath trims away the CONFLICT_SUFFIX if present
-                            let zpath = Cow::from(get_trimmed_keyexpr(&coarse_zpath));
+                            let zpath = get_trimmed_keyexpr(&coarse_zpath);
+                            let zpath_as_ke = match keyexpr::new(zpath.as_str()) {
+                                Ok(ke) => ke,
+                                Err(e) => {
+                                    log::error!(
+                                        "Couldn't convert `{}` into a key expression: {}",
+                                        &zpath,
+                                        e
+                                    );
+                                    continue;
+                                }
+                            };
                             // convert it to zenoh path for matching test with zpath_expr
-                            if key_expr::intersect(&zpath, self.zpath_expr) {
+                            if self.zpath_expr.intersects(zpath_as_ke) {
                                 // matching file; return a ZFile
                                 let zfile = ZFile {
-                                    zpath,
+                                    zpath: zpath.into(),
                                     fspath: fspath.clone(),
                                 };
                                 return Some(zfile);

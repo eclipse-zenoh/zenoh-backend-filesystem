@@ -14,6 +14,7 @@
 
 use async_trait::async_trait;
 use log::{debug, warn};
+use std::convert::TryInto;
 use std::io::prelude::*;
 use std::path::PathBuf;
 use std::{fs::DirBuilder, sync::Arc};
@@ -24,7 +25,7 @@ use zenoh_backend_traits::{
     config::StorageConfig, config::VolumeConfig, utils, CreateVolume, Query, Storage,
     StorageInsertionResult, Volume,
 };
-use zenoh_core::{bail, zerror};
+use zenoh_core::{bail, zerror, AsyncResolve};
 use zenoh_util::zenoh_home;
 
 mod data_info_mgt;
@@ -263,10 +264,15 @@ struct FileSystemStorage {
 
 impl FileSystemStorage {
     async fn reply_with_matching_files(&self, query: &Query, path_expr: &str) {
-        for zfile in self.files_mgr.matching_files(path_expr) {
-            let trimmed_zpath = get_trimmed_keyexpr(zfile.zpath.as_ref());
-            let trimmed_zfile = self.files_mgr.to_zfile(&trimmed_zpath);
-            self.reply_with_file(query, &trimmed_zfile).await;
+        match path_expr.try_into() {
+            Ok(ke) => {
+                for zfile in self.files_mgr.matching_files(ke) {
+                    let trimmed_zpath = get_trimmed_keyexpr(zfile.zpath.as_ref());
+                    let trimmed_zfile = self.files_mgr.to_zfile(&trimmed_zpath);
+                    self.reply_with_file(query, &trimmed_zfile).await;
+                }
+            }
+            Err(e) => log::error!("Couldn't convert `{}` to key expression: {}", path_expr, e),
         }
     }
 
@@ -279,10 +285,16 @@ impl FileSystemStorage {
                     zfile,
                 );
                 // append path_prefix to the zenoh path of this ZFile
-                let zpath = concat_str(&self.path_prefix, zfile.zpath.as_ref());
-                query
+                let zpath: KeyExpr = concat_str(&self.path_prefix, zfile.zpath.as_ref())
+                    .try_into()
+                    .unwrap();
+                if let Err(e) = query
                     .reply(Sample::new(zpath, value).with_timestamp(timestamp))
-                    .await;
+                    .res()
+                    .await
+                {
+                    log::error!("{}", e)
+                }
             }
             Ok(None) => (), // file not found, do nothing
             Err(e) => warn!(
@@ -306,7 +318,7 @@ impl Storage for FileSystemStorage {
         // strip path from "path_prefix" and converted to a ZFile
         let zfile = sample
             .key_expr
-            .try_as_str()?
+            .as_str()
             .strip_prefix(&self.path_prefix)
             .map(|p| self.files_mgr.to_zfile(p))
             .ok_or_else(|| {
@@ -364,10 +376,6 @@ impl Storage for FileSystemStorage {
                     Err("Received update for read-only File System Storage".into())
                 }
             }
-            SampleKind::Patch => {
-                warn!("Received PATCH for {}: not yet supported", sample.key_expr);
-                Err("Received update for read-only File System Storage".into())
-            }
         }
     }
 
@@ -379,10 +387,10 @@ impl Storage for FileSystemStorage {
         // get the list of sub-path expressions that will match the same stored keys than
         // the selector, if those keys had the path_prefix.
         let sub_selectors =
-            utils::get_sub_key_selectors(selector.key_selector.try_as_str()?, &self.path_prefix);
+            utils::get_sub_key_selectors(selector.key_expr.as_str(), &self.path_prefix);
         debug!(
             "Query on {} with path_prefix={} => sub_selectors = {:?}",
-            selector.key_selector, self.path_prefix, sub_selectors
+            selector.key_expr, self.path_prefix, sub_selectors
         );
 
         for sub_selector in sub_selectors {
@@ -403,7 +411,10 @@ impl Storage for FileSystemStorage {
         let mut result = Vec::new();
 
         // get all files in the filesystem
-        for zfile in self.files_mgr.matching_files("**") {
+        for zfile in self
+            .files_mgr
+            .matching_files(unsafe { keyexpr::from_str_unchecked("**") })
+        {
             let trimmed_zpath = get_trimmed_keyexpr(zfile.zpath.as_ref());
             let trimmed_zfile = self.files_mgr.to_zfile(&trimmed_zpath);
             match self.files_mgr.read_file(&trimmed_zfile).await {
