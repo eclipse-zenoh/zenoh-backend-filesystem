@@ -19,13 +19,15 @@ use std::io::prelude::*;
 use std::path::PathBuf;
 use std::{fs::DirBuilder, sync::Arc};
 use tempfile::tempfile_in;
+use zenoh::prelude::r#async::AsyncResolve;
+use zenoh::prelude::*;
+use zenoh::time::new_reception_timestamp;
 use zenoh::Result as ZResult;
-use zenoh::{prelude::*, time::new_reception_timestamp};
 use zenoh_backend_traits::{
     config::StorageConfig, config::VolumeConfig, utils, CreateVolume, Query, Storage,
     StorageInsertionResult, Volume,
 };
-use zenoh_core::{bail, zerror, AsyncResolve};
+use zenoh_core::{bail, zerror};
 use zenoh_util::zenoh_home;
 
 mod data_info_mgt;
@@ -293,7 +295,12 @@ impl FileSystemStorage {
                     .res()
                     .await
                 {
-                    log::error!("{}", e)
+                    log::error!(
+                        "Error replying to query on {} with file {}: {}",
+                        query.selector(),
+                        zfile,
+                        e
+                    );
                 }
             }
             Ok(None) => (), // file not found, do nothing
