@@ -455,7 +455,7 @@ impl<'a> Iterator for FilesIterator<'a> {
                             let coarse_zpath = fspath_to_zpath(&s[self.base_dir_len..]);
                             // zpath trims away the CONFLICT_SUFFIX if present
                             let zpath = get_trimmed_keyexpr(&coarse_zpath);
-                            let zpath_as_ke = match keyexpr::new(zpath.as_str()) {
+                            let zpath_as_ke = match keyexpr::new(zpath) {
                                 Ok(ke) => ke,
                                 Err(e) => {
                                     log::error!(
@@ -470,7 +470,7 @@ impl<'a> Iterator for FilesIterator<'a> {
                             if self.zpath_expr.intersects(zpath_as_ke) {
                                 // matching file; return a ZFile
                                 let zfile = ZFile {
-                                    zpath: zpath.into(),
+                                    zpath: zpath.to_string().into(),
                                     fspath: fspath.clone(),
                                 };
                                 return Some(zfile);
@@ -529,15 +529,13 @@ fn is_symlink<P: AsRef<Path>>(path: P) -> bool {
     }
 }
 
-pub(crate) fn get_trimmed_keyexpr(keyexpr: &str) -> String {
-    if keyexpr.ends_with(CONFLICT_SUFFIX) {
-        keyexpr
-            .strip_suffix(CONFLICT_SUFFIX)
-            .unwrap_or(keyexpr)
-            .to_string()
+pub(crate) fn get_trimmed_keyexpr(keyexpr: &str) -> &str {
+    let k = if keyexpr.ends_with(CONFLICT_SUFFIX) {
+        keyexpr.strip_suffix(CONFLICT_SUFFIX).unwrap_or(keyexpr)
     } else {
-        keyexpr.to_string()
-    }
+        keyexpr
+    };
+    k.strip_prefix('/').unwrap_or(k)
 }
 
 pub(crate) fn get_conflict_resolved_keyexpr(keyexpr: &str) -> String {

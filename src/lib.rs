@@ -270,7 +270,7 @@ impl FileSystemStorage {
             Ok(ke) => {
                 for zfile in self.files_mgr.matching_files(ke) {
                     let trimmed_zpath = get_trimmed_keyexpr(zfile.zpath.as_ref());
-                    let trimmed_zfile = self.files_mgr.to_zfile(&trimmed_zpath);
+                    let trimmed_zfile = self.files_mgr.to_zfile(trimmed_zpath);
                     self.reply_with_file(query, &trimmed_zfile).await;
                 }
             }
@@ -423,7 +423,7 @@ impl Storage for FileSystemStorage {
             .matching_files(unsafe { keyexpr::from_str_unchecked("**") })
         {
             let trimmed_zpath = get_trimmed_keyexpr(zfile.zpath.as_ref());
-            let trimmed_zfile = self.files_mgr.to_zfile(&trimmed_zpath);
+            let trimmed_zfile = self.files_mgr.to_zfile(trimmed_zpath);
             match self.files_mgr.read_file(&trimmed_zfile).await {
                 Ok(Some((_, timestamp))) => {
                     // append path_prefix to the zenoh path of this ZFile
