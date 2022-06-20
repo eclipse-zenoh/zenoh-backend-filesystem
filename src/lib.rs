@@ -138,7 +138,10 @@ impl Volume for FileSystemBackend {
                 config.key_expr
             )
         }
-        let path_prefix = config.strip_prefix.clone();
+        let mut path_prefix = config.strip_prefix.clone();
+        if !path_prefix.ends_with('/') {
+            path_prefix.push('/');
+        }
         let volume_cfg = match config.volume_cfg.as_object() {
             Some(v) => v,
             None => bail!("fs backed volumes require volume-specific configuration"),
@@ -282,7 +285,7 @@ impl FileSystemStorage {
         match self.files_mgr.read_file(zfile).await {
             Ok(Some((value, timestamp))) => {
                 debug!(
-                    "Replying to query on {} with file {}",
+                    "Replying to query on {} with file {:?}",
                     query.selector(),
                     zfile,
                 );

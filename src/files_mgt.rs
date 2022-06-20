@@ -94,9 +94,9 @@ impl FilesMgr {
     }
 
     fn to_fspath(&self, zpath: &str) -> PathBuf {
-        let mut os_str = self.base_dir().as_os_str().to_os_string();
-        os_str.push(zpath_to_fspath(zpath).as_ref());
-        PathBuf::from(os_str)
+        let mut fspath = self.base_dir.clone();
+        fspath.push(zpath_to_fspath(zpath).as_ref());
+        fspath
     }
 
     // ### Behaviour in case of conflict
