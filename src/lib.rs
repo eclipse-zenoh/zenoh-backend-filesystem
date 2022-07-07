@@ -396,12 +396,12 @@ impl Storage for FileSystemStorage {
 
         // get the list of sub-path expressions that will match the same stored keys than
         // the selector, if those keys had the path_prefix.
-        let sub_selectors =
-            utils::get_sub_key_selectors(selector.key_expr.as_str(), &self.path_prefix);
+        let sub_selectors = utils::get_sub_key_selectors(&selector.key_expr, &self.path_prefix);
         debug!(
             "Query on {} with path_prefix={} => sub_selectors = {:?}",
             selector.key_expr, self.path_prefix, sub_selectors
         );
+        let sub_selectors = sub_selectors?;
 
         for sub_selector in sub_selectors {
             if sub_selector.contains('*') {

@@ -25,6 +25,7 @@ use zenoh::Result as ZResult;
 use zenoh_buffers::reader::HasReader;
 use zenoh_collections::{Timed, TimedEvent, Timer};
 use zenoh_core::{bail, zerror};
+use zenoh_protocol::io::{WBufCodec, ZBufCodec};
 
 lazy_static::lazy_static! {
     static ref GC_PERIOD: Duration = Duration::new(30, 0);

@@ -247,10 +247,7 @@ impl FilesMgr {
                             let (encoding, timestamp) =
                                 self.get_encoding_and_timestamp(file).await?;
                             Ok(Some((
-                                Value {
-                                    payload: content.into(),
-                                    encoding,
-                                },
+                                Value::new(content.into()).encoding(encoding),
                                 timestamp,
                             )))
                         }
