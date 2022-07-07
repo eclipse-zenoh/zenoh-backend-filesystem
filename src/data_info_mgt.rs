@@ -59,7 +59,7 @@ impl DataInfoMgr {
         // start periodic GC event
         let timer = Timer::default();
         let gc = TimedEvent::periodic(*GC_PERIOD, GarbageCollectionEvent { db: db.clone() });
-        let _ = timer.add_async(gc).await;
+        timer.add_async(gc).await;
 
         Ok(DataInfoMgr { db, timer })
     }
