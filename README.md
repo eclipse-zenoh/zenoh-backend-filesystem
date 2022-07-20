@@ -58,10 +58,10 @@ You can setup storages either at zenoh router startup via a configuration file, 
             // configuration of a "demo" storage using the "fs" backend
             demo: {
               // the key expression this storage will subscribes to
-              key_expr: "/demo/example/**",
+              key_expr: "demo/example/**",
               // this prefix will be stripped from the received key when converting to file path
               // this argument is optional.
-              strip_prefix: "/demo/example",
+              strip_prefix: "demo/example",
               // the key/values will be stored as files within this directory (relative to ${ZBACKEND_FS_ROOT})
               volume: {
                 id: "fs",
