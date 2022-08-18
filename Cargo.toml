@@ -31,6 +31,7 @@ zenoh_backend_traits = { git = "https://github.com/eclipse-zenoh/zenoh", branch 
 zenoh = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "api-changes" }
 zenoh-util = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "api-changes" }
 zenoh-collections = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "api-changes" }
+zenoh-cfg-properties = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "api-changes" }
 zenoh-core = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "api-changes" }
 zenoh-buffers = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "api-changes" }
 zenoh-protocol = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "api-changes" }

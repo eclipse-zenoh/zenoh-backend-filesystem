@@ -18,7 +18,7 @@ use rocksdb::{IteratorMode, DB};
 use std::convert::TryInto;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use zenoh::buf::{WBuf, ZBuf};
+use zenoh::buffers::{WBuf, ZBuf};
 use zenoh::prelude::*;
 use zenoh::time::{Timestamp, NTP64};
 use zenoh::Result as ZResult;
