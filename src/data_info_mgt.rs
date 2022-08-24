@@ -22,7 +22,7 @@ use zenoh::buffers::{WBuf, ZBuf};
 use zenoh::prelude::*;
 use zenoh::time::{Timestamp, NTP64};
 use zenoh::Result as ZResult;
-use zenoh_buffers::reader::HasReader;
+use zenoh::buffers::reader::HasReader;
 use zenoh_collections::{Timed, TimedEvent, Timer};
 use zenoh_core::{bail, zerror};
 use zenoh_protocol::io::{WBufCodec, ZBufCodec};

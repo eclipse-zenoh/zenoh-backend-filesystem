@@ -92,7 +92,7 @@ pub fn create_volume(_unused: VolumeConfig) -> ZResult<Box<dyn Volume>> {
     };
     debug!("Using root dir: {}", root.display());
 
-    let mut properties = zenoh_cfg_properties::Properties::default();
+    let mut properties = zenoh::properties::Properties::default();
     properties.insert("root".into(), root.to_string_lossy().into());
     properties.insert("version".into(), LONG_VERSION.clone());
 
@@ -293,6 +293,7 @@ impl FileSystemStorage {
                         e
                     );
                 }
+                debug!("Reply sent !!!!!");
             }
             Ok(None) => (), // file not found, do nothing
             Err(e) => warn!(
