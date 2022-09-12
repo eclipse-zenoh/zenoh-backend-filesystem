@@ -24,7 +24,7 @@ use zenoh::prelude::*;
 use zenoh::time::new_reception_timestamp;
 use zenoh::Result as ZResult;
 use zenoh_backend_traits::{
-    config::StorageConfig, config::VolumeConfig, utils, CreateVolume, Query, Storage,
+    config::StorageConfig, config::VolumeConfig, CreateVolume, Query, Storage,
     StorageInsertionResult, Volume,
 };
 use zenoh_core::{bail, zerror};
@@ -92,7 +92,7 @@ pub fn create_volume(_unused: VolumeConfig) -> ZResult<Box<dyn Volume>> {
     };
     debug!("Using root dir: {}", root.display());
 
-    let mut properties = Properties::default();
+    let mut properties = zenoh::properties::Properties::default();
     properties.insert("root".into(), root.to_string_lossy().into());
     properties.insert("version".into(), LONG_VERSION.clone());
 
@@ -131,17 +131,6 @@ impl Volume for FileSystemBackend {
     }
 
     async fn create_storage(&mut self, mut config: StorageConfig) -> ZResult<Box<dyn Storage>> {
-        if !config.key_expr.starts_with(&config.strip_prefix) {
-            bail!(
-                r#"The specified "strip_prefix={}" is not a prefix of "key_expr={}""#,
-                config.strip_prefix,
-                config.key_expr
-            )
-        }
-        let mut path_prefix = config.strip_prefix.clone();
-        if !path_prefix.ends_with('/') {
-            path_prefix.push('/');
-        }
         let volume_cfg = match config.volume_cfg.as_object() {
             Some(v) => v,
             None => bail!("fs backed volumes require volume-specific configuration"),
@@ -244,8 +233,7 @@ impl Volume for FileSystemBackend {
 
         let files_mgr = FilesMgr::new(base_dir, follow_links, keep_mime, on_closure).await?;
         Ok(Box::new(FileSystemStorage {
-            admin_status: config,
-            path_prefix,
+            config,
             files_mgr,
             read_only,
         }))
@@ -261,8 +249,7 @@ impl Volume for FileSystemBackend {
 }
 
 struct FileSystemStorage {
-    admin_status: StorageConfig,
-    path_prefix: String,
+    config: StorageConfig,
     files_mgr: FilesMgr,
     read_only: bool,
 }
@@ -289,10 +276,11 @@ impl FileSystemStorage {
                     query.selector(),
                     zfile,
                 );
-                // append path_prefix to the zenoh path of this ZFile
-                let zpath: KeyExpr = concat_str(&self.path_prefix, zfile.zpath.as_ref())
-                    .try_into()
-                    .unwrap();
+                // if strip_prefix is set, prefix it back to the zenoh path of this ZFile
+                let zpath = match &self.config.strip_prefix {
+                    Some(prefix) => prefix.join(zfile.zpath.as_ref()).unwrap(),
+                    None => zfile.zpath.as_ref().try_into().unwrap(),
+                };
                 if let Err(e) = query
                     .reply(Sample::new(zpath, value).with_timestamp(timestamp))
                     .res()
@@ -305,6 +293,7 @@ impl FileSystemStorage {
                         e
                     );
                 }
+                debug!("Reply sent !!!!!");
             }
             Ok(None) => (), // file not found, do nothing
             Err(e) => warn!(
@@ -320,23 +309,23 @@ impl FileSystemStorage {
 #[async_trait]
 impl Storage for FileSystemStorage {
     fn get_admin_status(&self) -> serde_json::Value {
-        self.admin_status.to_json_value()
+        self.config.to_json_value()
     }
 
     // When receiving a Sample (i.e. on PUT or DELETE operations)
     async fn on_sample(&mut self, sample: Sample) -> ZResult<StorageInsertionResult> {
-        // strip path from "path_prefix" and converted to a ZFile
-        let zfile = sample
-            .key_expr
-            .as_str()
-            .strip_prefix(&self.path_prefix)
-            .map(|p| self.files_mgr.to_zfile(p))
-            .ok_or_else(|| {
-                zerror!(
-                    "Received a Sample not starting with path_prefix '{}'",
-                    self.path_prefix
-                )
-            })?;
+        // if strip_prefix is set, strip it from the sample key_expr for this ZFile
+        let zfile = match &self.config.strip_prefix {
+            Some(prefix) => match sample.key_expr.strip_prefix(prefix).as_slice() {
+                [ke] => self.files_mgr.to_zfile(ke.as_str()),
+                _ => bail!(
+                    "Received a Sample with keyexpr not starting with path_prefix '{}': '{}'",
+                    prefix,
+                    sample.key_expr
+                ),
+            },
+            None => self.files_mgr.to_zfile(sample.key_expr.as_str()),
+        };
 
         // get latest timestamp for this file (if referenced in data-info db or if exists on disk)
         // and drop incoming sample if older
@@ -394,22 +383,26 @@ impl Storage for FileSystemStorage {
         // get the query's Selector
         let selector = query.selector();
 
-        // get the list of sub-path expressions that will match the same stored keys than
-        // the selector, if those keys had the path_prefix.
-        let sub_selectors = utils::get_sub_key_selectors(&selector.key_expr, &self.path_prefix);
-        debug!(
-            "Query on {} with path_prefix={} => sub_selectors = {:?}",
-            selector.key_expr, self.path_prefix, sub_selectors
-        );
-        let sub_selectors = sub_selectors?;
+        // if strip_prefix is set, strip it from the Selector's keyexpr to get the list of sub-keyexpr
+        // that will match the same stored keys than the selector, if those keys had the path_prefix.
+        let sub_keyexpr = match &self.config.strip_prefix {
+            Some(prefix) => {
+                let vec = selector.key_expr.strip_prefix(prefix);
+                if vec.is_empty() {
+                    warn!("Received query on selector '{}', but the configured strip_prefix='{:?}' is not a prefix of this selector", selector, self.config.strip_prefix);
+                }
+                vec
+            }
+            None => vec![selector.key_expr.as_keyexpr()],
+        };
 
-        for sub_selector in sub_selectors {
-            if sub_selector.contains('*') {
-                self.reply_with_matching_files(&query, sub_selector).await;
+        for ke in sub_keyexpr {
+            if ke.contains('*') {
+                self.reply_with_matching_files(&query, ke).await;
             } else {
                 // path_expr correspond to 1 single file.
                 // Convert it to ZFile and reply it.
-                let zfile = self.files_mgr.to_zfile(sub_selector);
+                let zfile = self.files_mgr.to_zfile(ke);
                 self.reply_with_file(&query, &zfile).await;
             }
         }
@@ -417,7 +410,7 @@ impl Storage for FileSystemStorage {
         Ok(())
     }
 
-    async fn get_all_entries(&self) -> ZResult<Vec<(String, zenoh::time::Timestamp)>> {
+    async fn get_all_entries(&self) -> ZResult<Vec<(OwnedKeyExpr, zenoh::time::Timestamp)>> {
         let mut result = Vec::new();
 
         // get all files in the filesystem
@@ -429,8 +422,11 @@ impl Storage for FileSystemStorage {
             let trimmed_zfile = self.files_mgr.to_zfile(trimmed_zpath);
             match self.files_mgr.read_file(&trimmed_zfile).await {
                 Ok(Some((_, timestamp))) => {
-                    // append path_prefix to the zenoh path of this ZFile
-                    let zpath = concat_str(&self.path_prefix, zfile.zpath.as_ref());
+                    // if strip_prefix is set, prefix it back to the zenoh path of this ZFile
+                    let zpath = match &self.config.strip_prefix {
+                        Some(prefix) => prefix.join(zfile.zpath.as_ref()).unwrap(),
+                        None => zfile.zpath.as_ref().try_into().unwrap(),
+                    };
                     result.push((zpath, timestamp));
                 }
                 Ok(None) => (), // file not found, do nothing
@@ -442,15 +438,13 @@ impl Storage for FileSystemStorage {
         }
         // get deleted files information from rocksdb
         for (zpath, ts) in self.files_mgr.get_deleted_entries().await {
-            result.push((concat_str(&self.path_prefix, zpath), ts));
+            // if strip_prefix is set, prefix it back to the zenoh path of this ZFile
+            let zpath = match &self.config.strip_prefix {
+                Some(prefix) => prefix.join(&zpath).unwrap(),
+                None => zpath.try_into().unwrap(),
+            };
+            result.push((zpath, ts));
         }
         Ok(result)
     }
-}
-
-pub(crate) fn concat_str<S1: AsRef<str>, S2: AsRef<str>>(s1: S1, s2: S2) -> String {
-    let mut result = String::with_capacity(s1.as_ref().len() + s2.as_ref().len());
-    result.push_str(s1.as_ref());
-    result.push_str(s2.as_ref());
-    result
 }

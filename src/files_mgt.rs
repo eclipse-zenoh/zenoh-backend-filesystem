@@ -22,11 +22,10 @@ use std::iter::Iterator;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use walkdir::{IntoIter, WalkDir};
-use zenoh::buf::ZBuf;
+use zenoh::buffers::ZBuf;
 use zenoh::prelude::*;
 use zenoh::time::{Timestamp, TimestampId};
 use zenoh::Result as ZResult;
-use zenoh_buffers::traits::SplitBuffer;
 use zenoh_core::{bail, zerror};
 
 use crate::data_info_mgt::*;
