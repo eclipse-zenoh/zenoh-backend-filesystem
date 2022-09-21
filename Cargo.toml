@@ -28,7 +28,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 zenoh_backend_traits = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "api-changes" }
-zenoh = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "api-changes" }
+zenoh = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "api-changes", features = [ "unstable" ] }
 zenoh-util = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "api-changes" }
 zenoh-collections = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "api-changes" }
 zenoh-core = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "api-changes" }
