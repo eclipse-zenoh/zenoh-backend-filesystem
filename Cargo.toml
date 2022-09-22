@@ -27,27 +27,27 @@ name = "zbackend_fs"
 crate-type = ["cdylib"]
 
 [dependencies]
-zenoh_backend_traits = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "api-changes" }
-zenoh = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "api-changes", features = [ "unstable" ] }
-zenoh-util = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "api-changes" }
-zenoh-collections = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "api-changes" }
-zenoh-core = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "api-changes" }
-zenoh-protocol = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "api-changes" }
 async-std = "=1.12.0"
 async-trait = "0.1.57"
-uhlc = "0.5.1"
-lazy_static = "1.4.0"
-regex = "1.6.0"
+dunce = "1.0.2"
 env_logger = "0.9.1"
-log = "0.4.17"
 git-version = "0.3.5"
 home = "0.5.3"
-dunce = "1.0.2"
-tempfile = "3.3.0"
-walkdir = "2.3.2"
+lazy_static = "1.4.0"
+log = "0.4.17"
 mime_guess = "2.0.4"
+regex = "1.6.0"
 rocksdb = "0.19.0"
 serde_json = "1.0.85"
+tempfile = "3.3.0"
+uhlc = "0.5.1"
+walkdir = "2.3.2"
+zenoh = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "master", features = [ "unstable" ] }
+zenoh-collections = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "master" }
+zenoh-core = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "master" }
+zenoh-protocol = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "master" }
+zenoh-util = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "master" }
+zenoh_backend_traits = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "master" }
 
 [build-dependencies]
 rustc_version = "0.4.0"
