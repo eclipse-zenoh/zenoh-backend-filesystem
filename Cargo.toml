@@ -27,28 +27,27 @@ name = "zbackend_fs"
 crate-type = ["cdylib"]
 
 [dependencies]
-zenoh_backend_traits = { git = "https://github.com/eclipse-zenoh/zenoh" }
-zenoh = { git = "https://github.com/eclipse-zenoh/zenoh" }
-zenoh-util = { git = "https://github.com/eclipse-zenoh/zenoh" }
-zenoh-collections = { git = "https://github.com/eclipse-zenoh/zenoh" }
-zenoh-core = { git = "https://github.com/eclipse-zenoh/zenoh" }
-zenoh-buffers = { git = "https://github.com/eclipse-zenoh/zenoh" }
-zenoh-protocol = { git = "https://github.com/eclipse-zenoh/zenoh" }
-async-std = "=1.11.0"
-async-trait = "0.1.42"
-uhlc = "0.4.0"
-lazy_static = "1.4.0"
-regex = "1"
-env_logger = "0.9.0"
-log = "0.4"
-git-version = "0.3.4"
+async-std = "=1.12.0"
+async-trait = "0.1.57"
+dunce = "1.0.2"
+env_logger = "0.9.1"
+git-version = "0.3.5"
 home = "0.5.3"
-dunce = "1.0"
-tempfile = "3.2.0"
-walkdir = "2.3"
-mime_guess = "2.0.3"
-rocksdb = "0.17.0"
-serde_json = "1.0"
+lazy_static = "1.4.0"
+log = "0.4.17"
+mime_guess = "2.0.4"
+regex = "1.6.0"
+rocksdb = "0.19.0"
+serde_json = "1.0.85"
+tempfile = "3.3.0"
+uhlc = "0.5.1"
+walkdir = "2.3.2"
+zenoh = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "master", features = [ "unstable" ] }
+zenoh-collections = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "master" }
+zenoh-core = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "master" }
+zenoh-protocol = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "master" }
+zenoh-util = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "master" }
+zenoh_backend_traits = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "master" }
 
 [build-dependencies]
 rustc_version = "0.4.0"

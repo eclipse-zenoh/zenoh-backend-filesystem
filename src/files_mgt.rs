@@ -14,6 +14,7 @@
 use async_std::task;
 use log::{debug, trace, warn};
 use std::borrow::Cow;
+use std::convert::TryFrom;
 use std::fmt;
 use std::fs::{metadata, remove_dir, remove_dir_all, remove_file, rename, DirBuilder, File};
 use std::io::prelude::*;
@@ -21,12 +22,10 @@ use std::iter::Iterator;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use walkdir::{IntoIter, WalkDir};
-use zenoh::buf::ZBuf;
+use zenoh::buffers::ZBuf;
 use zenoh::prelude::*;
 use zenoh::time::{Timestamp, TimestampId};
-use zenoh::utils::key_expr;
 use zenoh::Result as ZResult;
-use zenoh_buffers::traits::SplitBuffer;
 use zenoh_core::{bail, zerror};
 
 use crate::data_info_mgt::*;
@@ -94,9 +93,9 @@ impl FilesMgr {
     }
 
     fn to_fspath(&self, zpath: &str) -> PathBuf {
-        let mut os_str = self.base_dir().as_os_str().to_os_string();
-        os_str.push(zpath_to_fspath(zpath).as_ref());
-        PathBuf::from(os_str)
+        let mut fspath = self.base_dir.clone();
+        fspath.push(zpath_to_fspath(zpath).as_ref());
+        fspath
     }
 
     // ### Behaviour in case of conflict
@@ -208,7 +207,7 @@ impl FilesMgr {
 
         // save timestamp in data-info (encoding is not used)
         self.data_info_mgr
-            .put_data_info(file, &Encoding::EMPTY, timestamp)
+            .put_data_info(file, &KnownEncoding::Empty.into(), timestamp)
             .await
     }
 
@@ -247,10 +246,7 @@ impl FilesMgr {
                             let (encoding, timestamp) =
                                 self.get_encoding_and_timestamp(file).await?;
                             Ok(Some((
-                                Value {
-                                    payload: content.into(),
-                                    encoding,
-                                },
+                                Value::new(content.into()).encoding(encoding),
                                 timestamp,
                             )))
                         }
@@ -266,7 +262,7 @@ impl FilesMgr {
     }
 
     // Search for files matching path_expr.
-    pub(crate) fn matching_files<'a>(&self, zpath_expr: &'a str) -> FilesIterator<'a> {
+    pub(crate) fn matching_files<'a>(&self, zpath_expr: &'a keyexpr) -> FilesIterator<'a> {
         // find the longest segment without '*' to search for files only in the corresponding
         let star_idx = zpath_expr.find('*').unwrap();
         let segment = match zpath_expr[..star_idx].rfind('/') {
@@ -333,7 +329,7 @@ impl FilesMgr {
             let mime_type = mime_guess::from_path(&file).first_or_octet_stream();
             Encoding::from(mime_type.essence_str().to_string())
         } else {
-            Encoding::APP_OCTET_STREAM
+            KnownEncoding::AppOctetStream.into()
         }
     }
 
@@ -369,7 +365,7 @@ impl FilesMgr {
             .unwrap_or_else(|_| SystemTime::now());
         Ok(Timestamp::new(
             sys_time.duration_since(UNIX_EPOCH).unwrap().into(),
-            TimestampId::new(1, [0u8; TimestampId::MAX_SIZE]),
+            TimestampId::try_from([1]).unwrap(),
         ))
     }
 
@@ -433,7 +429,7 @@ impl Drop for FilesMgr {
 
 pub(crate) struct FilesIterator<'a> {
     walk_iter: IntoIter,
-    zpath_expr: &'a str,
+    zpath_expr: &'a keyexpr,
     base_dir_len: usize,
 }
 
@@ -454,12 +450,23 @@ impl<'a> Iterator for FilesIterator<'a> {
                             // coarse_zpath is the file's absolute path stripped from base_dir and converted as zenoh path
                             let coarse_zpath = fspath_to_zpath(&s[self.base_dir_len..]);
                             // zpath trims away the CONFLICT_SUFFIX if present
-                            let zpath = Cow::from(get_trimmed_keyexpr(&coarse_zpath));
+                            let zpath = get_trimmed_keyexpr(&coarse_zpath);
+                            let zpath_as_ke = match keyexpr::new(zpath) {
+                                Ok(ke) => ke,
+                                Err(e) => {
+                                    log::error!(
+                                        "Couldn't convert `{}` into a key expression: {}",
+                                        &zpath,
+                                        e
+                                    );
+                                    continue;
+                                }
+                            };
                             // convert it to zenoh path for matching test with zpath_expr
-                            if key_expr::intersect(&zpath, self.zpath_expr) {
+                            if self.zpath_expr.intersects(zpath_as_ke) {
                                 // matching file; return a ZFile
                                 let zfile = ZFile {
-                                    zpath,
+                                    zpath: zpath.to_string().into(),
                                     fspath: fspath.clone(),
                                 };
                                 return Some(zfile);
@@ -518,15 +525,13 @@ fn is_symlink<P: AsRef<Path>>(path: P) -> bool {
     }
 }
 
-pub(crate) fn get_trimmed_keyexpr(keyexpr: &str) -> String {
-    if keyexpr.ends_with(CONFLICT_SUFFIX) {
-        keyexpr
-            .strip_suffix(CONFLICT_SUFFIX)
-            .unwrap_or(keyexpr)
-            .to_string()
+pub(crate) fn get_trimmed_keyexpr(keyexpr: &str) -> &str {
+    let k = if keyexpr.ends_with(CONFLICT_SUFFIX) {
+        keyexpr.strip_suffix(CONFLICT_SUFFIX).unwrap_or(keyexpr)
     } else {
-        keyexpr.to_string()
-    }
+        keyexpr
+    };
+    k.strip_prefix('/').unwrap_or(k)
 }
 
 pub(crate) fn get_conflict_resolved_keyexpr(keyexpr: &str) -> String {
