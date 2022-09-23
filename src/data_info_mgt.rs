@@ -160,13 +160,7 @@ impl DataInfoMgr {
     pub async fn get_deleted_entries(&self) -> Vec<(String, Timestamp)> {
         let mut result = Vec::new();
         let db = self.db.lock().await;
-        for (key, value) in db.iterator(IteratorMode::Start).filter_map(|r| match r {
-            Ok(x) => Some(x),
-            Err(e) => {
-                warn!("Error iterating over RocksDB: {}", e);
-                None
-            }
-        }) {
+        for (key, value) in db.iterator(IteratorMode::Start) {
             if let Ok(path) = std::str::from_utf8(&key).map(Path::new) {
                 if !path.exists() {
                     match decode_timestamp_from_value(&value) {
@@ -227,13 +221,7 @@ impl Timed for GarbageCollectionEvent {
         let time_limit = NTP64::from(SystemTime::now().duration_since(UNIX_EPOCH).unwrap())
             - *MIN_DELAY_BEFORE_REMOVAL;
         let db = self.db.lock().await;
-        for (key, value) in db.iterator(IteratorMode::Start).filter_map(|r| match r {
-            Ok(x) => Some(x),
-            Err(e) => {
-                warn!("Error iterating over RocksDB: {}", e);
-                None
-            }
-        }) {
+        for (key, value) in db.iterator(IteratorMode::Start) {
             if let Ok(path) = std::str::from_utf8(&key).map(Path::new) {
                 if !path.exists() {
                     // check if path was marked as deleted for a long time
