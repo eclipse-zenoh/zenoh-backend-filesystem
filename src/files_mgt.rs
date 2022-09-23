@@ -407,7 +407,7 @@ impl Drop for FilesMgr {
         match self.on_closure {
             OnClosure::DeleteAll => {
                 // Close data_info_mgr at first
-                let _ = task::block_on(async move {
+                task::block_on(async move {
                     self.data_info_mgr
                         .close()
                         .await
