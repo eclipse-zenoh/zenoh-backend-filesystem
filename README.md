@@ -75,8 +75,8 @@ You can setup storages either at zenoh router startup via a configuration file, 
 
 ### **Setup at runtime via `curl` commands on the admin space**
 
-  - Run the zenoh router:
-    `zenohd`
+  - Run the zenoh router, with write permissions to its admin space:
+    `zenohd --adminspace-permissions rw`
   - Add the "fs" backend (the "zbackend_fs" library will be loaded):  
     `curl -X PUT -H 'content-type:application/json' -d '{}' http://localhost:8000/@/router/local/config/plugins/storage_manager/volumes/fs`
   - Add the "demo" storage using the "fs" backend:  
