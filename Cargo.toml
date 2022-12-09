@@ -12,8 +12,10 @@
 #   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 #
 [package]
-name = "zenoh_backend_filesystem"
+name = "zenoh-backend-filesystem"
 version = "0.7.0-rc"
+repository = "https://github.com/eclipse-zenoh/zenoh-backend-filesystem"
+homepage = "http://zenoh.io"
 authors = [
     "kydos <angelo@icorsaro.net>",
     "Julien Enoch <julien@enoch.fr>",
@@ -21,10 +23,13 @@ authors = [
     "Luca Cominardi <luca.cominardi@zettascale.tech>",
 ]
 edition = "2018"
+license = " EPL-2.0 OR Apache-2.0"
+categories = ["network-programming"]
+description = "Backend for Zenoh using the file system"
 
 [lib]
 name = "zbackend_fs"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 async-std = "=1.12.0"

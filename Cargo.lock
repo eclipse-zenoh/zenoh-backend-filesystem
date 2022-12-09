@@ -2636,6 +2636,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "zenoh-backend-filesystem"
+version = "0.7.0-rc"
+dependencies = [
+ "async-std",
+ "async-trait",
+ "dunce",
+ "env_logger",
+ "git-version",
+ "home",
+ "lazy_static",
+ "log",
+ "mime_guess",
+ "regex",
+ "rocksdb",
+ "rustc_version",
+ "serde_json",
+ "tempfile",
+ "uhlc",
+ "walkdir",
+ "zenoh",
+ "zenoh-collections",
+ "zenoh-core",
+ "zenoh-protocol",
+ "zenoh-util",
+ "zenoh_backend_traits",
+]
+
+[[package]]
 name = "zenoh-buffers"
 version = "0.7.0-rc"
 source = "git+https://github.com/eclipse-zenoh/zenoh?branch=master#7b8411e658d2db6d28ed581035e7754d2ef366be"
@@ -2960,34 +2988,6 @@ dependencies = [
  "zenoh-core",
  "zenoh-crypto",
  "zenoh-sync",
-]
-
-[[package]]
-name = "zenoh_backend_filesystem"
-version = "0.7.0-rc"
-dependencies = [
- "async-std",
- "async-trait",
- "dunce",
- "env_logger",
- "git-version",
- "home",
- "lazy_static",
- "log",
- "mime_guess",
- "regex",
- "rocksdb",
- "rustc_version",
- "serde_json",
- "tempfile",
- "uhlc",
- "walkdir",
- "zenoh",
- "zenoh-collections",
- "zenoh-core",
- "zenoh-protocol",
- "zenoh-util",
- "zenoh_backend_traits",
 ]
 
 [[package]]
