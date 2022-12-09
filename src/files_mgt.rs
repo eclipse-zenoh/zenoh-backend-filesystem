@@ -232,8 +232,8 @@ impl FilesMgr {
 
     async fn perform_read(&self, file: &Path) -> ZResult<Option<(Value, Timestamp)>> {
         // consider file only is it exists, it's a file and in case of "follow_links=true" it doesn't contain symlink
-        if file.exists() && file.is_file() && (self.follow_links || !self.contains_symlink(&file)) {
-            match File::open(&file) {
+        if file.exists() && file.is_file() && (self.follow_links || !self.contains_symlink(file)) {
+            match File::open(file) {
                 Ok(mut f) => {
                     // TODO: what if file is too big ??
                     let size = f.metadata().map(|m| m.len()).unwrap_or(256);
@@ -326,7 +326,7 @@ impl FilesMgr {
     fn guess_encoding(&self, file: &Path) -> Encoding {
         if self.keep_mime {
             // fallback: guess mime type from file extension
-            let mime_type = mime_guess::from_path(&file).first_or_octet_stream();
+            let mime_type = mime_guess::from_path(file).first_or_octet_stream();
             Encoding::from(mime_type.essence_str().to_string())
         } else {
             KnownEncoding::AppOctetStream.into()
