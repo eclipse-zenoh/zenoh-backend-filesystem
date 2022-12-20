@@ -6,12 +6,17 @@
 [![License](https://img.shields.io/badge/License-EPL%202.0-blue)](https://choosealicense.com/licenses/epl-2.0/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-# Eclipse Zenoh - File system backend
+# Eclipse Zenoh
 
 The Eclipse Zenoh: Zero Overhead Pub/sub, Store/Query and Compute.
 
 Zenoh (pronounce _/zeno/_) unifies data in motion, data at rest and computations. It carefully blends traditional pub/sub with geo-distributed storages, queries and computations, while retaining a level of time and space efficiency that is well beyond any of the mainstream stacks.
 
+Check the website [zenoh.io](http://zenoh.io) and the [roadmap](https://github.com/eclipse-zenoh/roadmap) for more detailed information.
+
+-------------------------------
+# File system backend
+ 
 In zenoh a backend is a storage technology (such as DBMS, time-series database, file system...) alowing to store the
 keys/values publications made via zenoh and return them on queries.
 See the [zenoh documentation](http://zenoh.io/docs/manual/backends/) for more details.
