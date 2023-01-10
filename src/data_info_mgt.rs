@@ -15,17 +15,15 @@ use async_std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use log::{trace, warn};
 use rocksdb::{IteratorMode, DB};
-use std::convert::TryInto;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use zenoh::buffers::reader::HasReader;
-use zenoh::buffers::{WBuf, ZBuf};
+use zenoh::buffers::{reader::HasReader, writer::HasWriter};
 use zenoh::prelude::*;
 use zenoh::time::{Timestamp, NTP64};
 use zenoh::Result as ZResult;
-use zenoh_collections::{Timed, TimedEvent, Timer};
+use zenoh_codec::{RCodec, WCodec, Zenoh060};
 use zenoh_core::{bail, zerror};
-use zenoh_protocol::io::{WBufCodec, ZBufCodec};
+use zenoh_util::{Timed, TimedEvent, Timer};
 
 lazy_static::lazy_static! {
     static ref GC_PERIOD: Duration = Duration::new(30, 0);
@@ -79,24 +77,26 @@ impl DataInfoMgr {
         encoding: &Encoding,
         timestamp: &Timestamp,
     ) -> ZResult<()> {
+        const ERR: &str = "Failed to encode data-info for";
+
         let key = file.as_ref().to_string_lossy();
         trace!("Put data-info for {}", key);
-        let mut value: WBuf = WBuf::new(32, true);
+        let mut value = vec![];
+        let mut writer = value.writer();
+        let codec = Zenoh060::default();
         // note: encode timestamp at first for faster decoding when only this one is required
-        let write_ok = value.write_timestamp(timestamp)
-            && value.write_zint(u8::from(*encoding.prefix()).into())
-            && value.write_string(encoding.suffix());
-        if !write_ok {
-            bail!("Failed to encode data-info for {:?}", file.as_ref())
-        } else {
-            self.db
-                .lock()
-                .await
-                .put(key.as_bytes(), value.get_first_slice(..))
-                .map_err(|e| {
-                    zerror!("Failed to save data-info for {:?}: {}", file.as_ref(), e).into()
-                })
-        }
+        codec
+            .write(&mut writer, timestamp)
+            .map_err(|_| zerror!("{} {:?}", ERR, file.as_ref()))?;
+        codec
+            .write(&mut writer, encoding)
+            .map_err(|_| zerror!("{} {:?}", ERR, file.as_ref()))?;
+
+        self.db
+            .lock()
+            .await
+            .put(key.as_bytes(), value)
+            .map_err(|e| zerror!("Failed to save data-info for {:?}: {}", file.as_ref(), e).into())
     }
 
     pub(crate) async fn rename_key<P: AsRef<Path>>(&self, from: P, to: P) -> ZResult<()> {
@@ -178,34 +178,23 @@ impl DataInfoMgr {
 }
 
 fn decode_encoding_timestamp_from_value(val: &[u8]) -> ZResult<(Encoding, Timestamp)> {
-    let buf = ZBuf::from(val.to_vec());
-    let mut buf = buf.reader();
-    let timestamp = buf
-        .read_timestamp()
-        .ok_or_else(|| zerror!("Failed to decode data-info (timestamp)"))?;
-    let encoding_prefix = buf
-        .read_zint()
-        .ok_or_else(|| zerror!("Failed to decode data-info (encoding.prefix)"))?;
-    let encoding_suffix = buf
-        .read_string()
-        .ok_or_else(|| zerror!("Failed to decode data-info (encoding.suffix)"))?;
-    let encoding_prefix = encoding_prefix
-        .try_into()
-        .map_err(|_| zerror!("Unknown encoding {}", encoding_prefix))?;
-    let encoding = if encoding_suffix.is_empty() {
-        Encoding::Exact(encoding_prefix)
-    } else {
-        Encoding::WithSuffix(encoding_prefix, encoding_suffix.into())
-    };
+    let codec = Zenoh060::default();
+    let mut reader = val.reader();
+    let timestamp: Timestamp = codec
+        .read(&mut reader)
+        .map_err(|_| zerror!("Failed to decode data-info (timestamp)"))?;
+    let encoding: Encoding = codec
+        .read(&mut reader)
+        .map_err(|_| zerror!("Failed to decode data-info (encoding)"))?;
     Ok((encoding, timestamp))
 }
 
 fn decode_timestamp_from_value(val: &[u8]) -> ZResult<Timestamp> {
-    let buf = ZBuf::from(val.to_vec());
-    let mut buf = buf.reader();
-    let timestamp = buf
-        .read_timestamp()
-        .ok_or_else(|| zerror!("Failed to decode data-info (timestamp)"))?;
+    let codec = Zenoh060::default();
+    let mut reader = val.reader();
+    let timestamp: Timestamp = codec
+        .read(&mut reader)
+        .map_err(|_| zerror!("Failed to decode data-info (timestamp)"))?;
     Ok(timestamp)
 }
 
