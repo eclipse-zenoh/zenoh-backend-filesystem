@@ -33,7 +33,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 async-std = "=1.12.0"
-async-trait = "0.1.57"
+async-trait = "0.1.60"
 dunce = "1.0.2"
 env_logger = "0.10.0"
 git-version = "0.3.5"
@@ -45,7 +45,7 @@ regex = "1.7.0"
 rocksdb = "0.18.0"
 serde_json = "1.0.89"
 tempfile = "3.3.0"
-uhlc = "0.5.1"
+uhlc = { git = "https://github.com/atolab/uhlc-rs.git" } # TODO: Using github source until the no_std update gets released on crates.io
 walkdir = "2.3.2"
 zenoh = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "master", features = [ "unstable" ] }
 zenoh-codec = {git = "https://github.com/eclipse-zenoh/zenoh", branch = "master" }
