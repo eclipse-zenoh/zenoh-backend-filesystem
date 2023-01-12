@@ -179,7 +179,6 @@ impl FilesMgr {
     pub(crate) async fn delete_file(
         &self,
         zfile: &ZFile<'_>,
-        timestamp: &Timestamp,
     ) -> ZResult<()> {
         let file = &zfile.fspath;
 
@@ -206,9 +205,7 @@ impl FilesMgr {
         }
 
         // save timestamp in data-info (encoding is not used)
-        self.data_info_mgr
-            .put_data_info(file, &KnownEncoding::Empty.into(), timestamp)
-            .await
+        self.data_info_mgr.del_data_info(file).await
     }
 
     // Read a file and return it's content (as Vec<u8>), encoding and timestamp.
@@ -330,23 +327,6 @@ impl FilesMgr {
             Encoding::from(mime_type.essence_str().to_string())
         } else {
             KnownEncoding::AppOctetStream.into()
-        }
-    }
-
-    pub(crate) async fn get_timestamp(&self, zfile: &ZFile<'_>) -> ZResult<Option<Timestamp>> {
-        let file = &zfile.fspath;
-        // try to get Timestamp from data_info_mgr
-        match self.data_info_mgr.get_timestamp(&file).await? {
-            Some(x) => Ok(Some(x)),
-            None => {
-                // fallback: get timestamp from file's metadata if it exists
-                if file.exists() {
-                    let timestamp = self.get_timestamp_from_metadata(file)?;
-                    Ok(Some(timestamp))
-                } else {
-                    Ok(None)
-                }
-            }
         }
     }
 

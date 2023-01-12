@@ -99,6 +99,19 @@ impl DataInfoMgr {
             .map_err(|e| zerror!("Failed to save data-info for {:?}: {}", file.as_ref(), e).into())
     }
 
+    pub(crate) async fn del_data_info<P: AsRef<Path>>(
+        &self,
+        file: P,
+    ) -> ZResult<()> {
+        let key = file.as_ref().to_string_lossy();
+        trace!("Delete data-info for {}", key);
+        let db = self.db.lock().await;
+        match db.delete(key.as_bytes()){
+            Ok(()) => Ok(()),
+            Err(e) => Err(format!("Failed to delete data-info for file {:?}: {}", file.as_ref(), e).into())
+        }
+    }
+
     pub(crate) async fn rename_key<P: AsRef<Path>>(&self, from: P, to: P) -> ZResult<()> {
         let from_key = from.as_ref().to_string_lossy();
         let to_key = to.as_ref().to_string_lossy();
@@ -135,22 +148,6 @@ impl DataInfoMgr {
             Ok(Some(pin_val)) => decode_encoding_timestamp_from_value(pin_val.as_ref()).map(Some),
             Ok(None) => {
                 trace!("data-info for {:?} not found", file.as_ref());
-                Ok(None)
-            }
-            Err(e) => bail!("Failed to get data-info for {:?}: {}", file.as_ref(), e),
-        }
-    }
-
-    pub(crate) async fn get_timestamp<P: AsRef<Path>>(
-        &self,
-        file: P,
-    ) -> ZResult<Option<Timestamp>> {
-        let key = file.as_ref().to_string_lossy();
-        trace!("Get timestamp for {}", key);
-        match self.db.lock().await.get_pinned(key.as_bytes()) {
-            Ok(Some(pin_val)) => decode_timestamp_from_value(pin_val.as_ref()).map(Some),
-            Ok(None) => {
-                trace!("timestamp for {:?} not found", file.as_ref());
                 Ok(None)
             }
             Err(e) => bail!("Failed to get data-info for {:?}: {}", file.as_ref(), e),
