@@ -99,16 +99,18 @@ impl DataInfoMgr {
             .map_err(|e| zerror!("Failed to save data-info for {:?}: {}", file.as_ref(), e).into())
     }
 
-    pub(crate) async fn del_data_info<P: AsRef<Path>>(
-        &self,
-        file: P,
-    ) -> ZResult<()> {
+    pub(crate) async fn del_data_info<P: AsRef<Path>>(&self, file: P) -> ZResult<()> {
         let key = file.as_ref().to_string_lossy();
         trace!("Delete data-info for {}", key);
         let db = self.db.lock().await;
-        match db.delete(key.as_bytes()){
+        match db.delete(key.as_bytes()) {
             Ok(()) => Ok(()),
-            Err(e) => Err(format!("Failed to delete data-info for file {:?}: {}", file.as_ref(), e).into())
+            Err(e) => Err(format!(
+                "Failed to delete data-info for file {:?}: {}",
+                file.as_ref(),
+                e
+            )
+            .into()),
         }
     }
 

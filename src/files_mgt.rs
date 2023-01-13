@@ -176,10 +176,7 @@ impl FilesMgr {
         }
     }
 
-    pub(crate) async fn delete_file(
-        &self,
-        zfile: &ZFile<'_>,
-    ) -> ZResult<()> {
+    pub(crate) async fn delete_file(&self, zfile: &ZFile<'_>) -> ZResult<()> {
         let file = &zfile.fspath;
 
         let file = if file.exists() && file.is_file() {

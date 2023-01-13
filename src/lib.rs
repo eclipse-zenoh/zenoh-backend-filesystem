@@ -14,7 +14,6 @@
 
 use async_trait::async_trait;
 use log::{debug, warn};
-use zenoh_backend_traits::{Capability, Persistence, History};
 use std::convert::TryInto;
 use std::io::prelude::*;
 use std::path::PathBuf;
@@ -23,9 +22,10 @@ use tempfile::tempfile_in;
 use zenoh::prelude::*;
 use zenoh::Result as ZResult;
 use zenoh_backend_traits::{
-    config::StorageConfig, config::VolumeConfig, CreateVolume, Storage,
-    StorageInsertionResult, Volume,
+    config::StorageConfig, config::VolumeConfig, CreateVolume, Storage, StorageInsertionResult,
+    Volume,
 };
+use zenoh_backend_traits::{Capability, History, Persistence};
 use zenoh_core::{bail, zerror};
 use zenoh_util::zenoh_home;
 
@@ -302,7 +302,11 @@ impl Storage for FileSystemStorage {
     }
 
     /// Function called for each incoming delete request to this storage.
-    async fn delete(&mut self, key: OwnedKeyExpr, _timestamp: zenoh::time::Timestamp) -> ZResult<StorageInsertionResult> {
+    async fn delete(
+        &mut self,
+        key: OwnedKeyExpr,
+        _timestamp: zenoh::time::Timestamp,
+    ) -> ZResult<StorageInsertionResult> {
         // if strip_prefix is set, strip it from the sample key_expr for this ZFile
         let zfile = match &self.config.strip_prefix {
             Some(prefix) => match key.strip_prefix(prefix).as_slice() {
@@ -330,7 +334,7 @@ impl Storage for FileSystemStorage {
     }
 
     /// Function to retrieve the sample associated with a single key.
-    async fn get(&mut self, key: OwnedKeyExpr, _parameters: &str) -> ZResult<Sample> {
+    async fn get(&mut self, key: OwnedKeyExpr, _parameters: &str) -> ZResult<Vec<Sample>> {
         // if strip_prefix is set, strip it from the sample key_expr for this ZFile
         let zfile = match &self.config.strip_prefix {
             Some(prefix) => match key.strip_prefix(prefix).as_slice() {
@@ -345,15 +349,13 @@ impl Storage for FileSystemStorage {
         };
 
         match self.files_mgr.read_file(&zfile).await {
-            Ok(Some((value, timestamp))) =>
-                Ok(Sample::new(key, value).with_timestamp(timestamp)),
-            Ok(None) => Err(format!("File not found for key {}", key).into()), 
-            Err(e) => Err(format!(
-                "Get key {} : failed to read file {} : {}",
-                key,
-                zfile,
-                e
-            ).into()),
+            Ok(Some((value, timestamp))) => {
+                Ok(vec![Sample::new(key, value).with_timestamp(timestamp)])
+            }
+            Ok(None) => Err(format!("File not found for key {}", key).into()),
+            Err(e) => {
+                Err(format!("Get key {} : failed to read file {} : {}", key, zfile, e).into())
+            }
         }
     }
 
