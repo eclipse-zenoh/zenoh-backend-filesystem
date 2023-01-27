@@ -535,5 +535,5 @@ pub(crate) fn get_trimmed_keyexpr(keyexpr: &str) -> &str {
 }
 
 pub(crate) fn get_conflict_resolved_keyexpr(keyexpr: &str) -> String {
-    format!("{}{}", keyexpr, CONFLICT_SUFFIX)
+    format!("{keyexpr}{CONFLICT_SUFFIX}")
 }
