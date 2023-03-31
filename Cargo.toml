@@ -46,7 +46,7 @@ regex = "1.7.0"
 rocksdb = "0.18.0"
 serde_json = "1.0.89"
 tempfile = "3.3.0"
-uhlc = { git = "https://github.com/atolab/uhlc-rs.git" } # TODO: Using github source until the no_std update gets released on crates.io
+uhlc = "0.5.2"
 walkdir = "2.3.2"
 zenoh = { git = "https://github.com/sreeja/zenoh", branch="storage-refactor", features = [ "unstable" ] }
 zenoh-codec = {git = "https://github.com/sreeja/zenoh", branch = "storage-refactor" }
