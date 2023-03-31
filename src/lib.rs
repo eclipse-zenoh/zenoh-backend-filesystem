@@ -20,12 +20,13 @@ use std::path::PathBuf;
 use std::{fs::DirBuilder, sync::Arc};
 use tempfile::tempfile_in;
 use zenoh::prelude::*;
+use zenoh::time::Timestamp;
 use zenoh::Result as ZResult;
 use zenoh_backend_traits::{
     config::StorageConfig, config::VolumeConfig, CreateVolume, Storage, StorageInsertionResult,
     Volume,
 };
-use zenoh_backend_traits::{Capability, History, Persistence};
+use zenoh_backend_traits::{Capability, History, Persistence, StoredData};
 use zenoh_core::{bail, zerror};
 use zenoh_util::zenoh_home;
 
@@ -48,6 +49,9 @@ pub const PROP_STORAGE_DIR: &str = "dir";
 pub const PROP_STORAGE_ON_CLOSURE: &str = "on_closure";
 pub const PROP_STORAGE_FOLLOW_LINK: &str = "follow_links";
 pub const PROP_STORAGE_KEEP_MIME: &str = "keep_mime_types";
+
+// Special key for None (when the prefix being stripped exactly matches the key)
+pub const NONE_KEY: &str = "@@none_key@@";
 
 const GIT_VERSION: &str = git_version::git_version!(prefix = "v", cargo_prefix = "v");
 lazy_static::lazy_static!(
@@ -267,31 +271,29 @@ impl Storage for FileSystemStorage {
         self.config.to_json_value()
     }
 
-    async fn put(&mut self, key: OwnedKeyExpr, sample: Sample) -> ZResult<StorageInsertionResult> {
-        // if strip_prefix is set, strip it from the sample key_expr for this ZFile
-        let zfile = match &self.config.strip_prefix {
-            Some(prefix) => match key.strip_prefix(prefix).as_slice() {
-                [ke] => self.files_mgr.to_zfile(ke.as_str()),
-                _ => bail!(
-                    "Received a Sample with keyexpr not starting with path_prefix '{}': '{}'",
-                    prefix,
-                    key
-                ),
-            },
-            None => self.files_mgr.to_zfile(key.as_str()),
-        };
-
+    async fn put(
+        &mut self,
+        key: Option<OwnedKeyExpr>,
+        value: Value,
+        timestamp: Timestamp,
+    ) -> ZResult<StorageInsertionResult> {
         if !self.read_only {
-            // write file
-            self.files_mgr
-                .write_file(
-                    &zfile,
-                    sample.value.payload,
-                    &sample.value.encoding,
-                    &sample.timestamp.unwrap(),
-                )
-                .await?;
-            Ok(StorageInsertionResult::Inserted)
+            if let Some(k) = key {
+                let k = k.as_str();
+                let zfile = self.files_mgr.to_zfile(k);
+                // write file
+                self.files_mgr
+                    .write_file(&zfile, value.payload, &value.encoding, &timestamp)
+                    .await?;
+                Ok(StorageInsertionResult::Inserted)
+            } else {
+                let zfile = self.files_mgr.to_zfile(NONE_KEY);
+                // write file
+                self.files_mgr
+                    .write_file(&zfile, value.payload, &value.encoding, &timestamp)
+                    .await?;
+                Ok(StorageInsertionResult::Inserted)
+            }
         } else {
             warn!(
                 "Received PUT for read-only Files System Storage on {:?} - ignored",
@@ -304,26 +306,22 @@ impl Storage for FileSystemStorage {
     /// Function called for each incoming delete request to this storage.
     async fn delete(
         &mut self,
-        key: OwnedKeyExpr,
-        _timestamp: zenoh::time::Timestamp,
+        key: Option<OwnedKeyExpr>,
+        _timestamp: Timestamp,
     ) -> ZResult<StorageInsertionResult> {
-        // if strip_prefix is set, strip it from the sample key_expr for this ZFile
-        let zfile = match &self.config.strip_prefix {
-            Some(prefix) => match key.strip_prefix(prefix).as_slice() {
-                [ke] => self.files_mgr.to_zfile(ke.as_str()),
-                _ => bail!(
-                    "Received a Sample with keyexpr not starting with path_prefix '{}': '{}'",
-                    prefix,
-                    key
-                ),
-            },
-            None => self.files_mgr.to_zfile(key.as_str()),
-        };
-
         if !self.read_only {
-            // delete file
-            self.files_mgr.delete_file(&zfile).await?;
-            Ok(StorageInsertionResult::Deleted)
+            if let Some(k) = key {
+                let k = k.as_str();
+                let zfile = self.files_mgr.to_zfile(k);
+                // delete file
+                self.files_mgr.delete_file(&zfile).await?;
+                Ok(StorageInsertionResult::Deleted)
+            } else {
+                let zfile = self.files_mgr.to_zfile(NONE_KEY);
+                // delete file
+                self.files_mgr.delete_file(&zfile).await?;
+                Ok(StorageInsertionResult::Deleted)
+            }
         } else {
             warn!(
                 "Received DELETE for read-only Files System Storage on {:?} - ignored",
@@ -334,32 +332,35 @@ impl Storage for FileSystemStorage {
     }
 
     /// Function to retrieve the sample associated with a single key.
-    async fn get(&mut self, key: OwnedKeyExpr, _parameters: &str) -> ZResult<Vec<Sample>> {
-        // if strip_prefix is set, strip it from the sample key_expr for this ZFile
-        let zfile = match &self.config.strip_prefix {
-            Some(prefix) => match key.strip_prefix(prefix).as_slice() {
-                [ke] => self.files_mgr.to_zfile(ke.as_str()),
-                _ => bail!(
-                    "Received a Sample with keyexpr not starting with path_prefix '{}': '{}'",
-                    prefix,
-                    key
-                ),
-            },
-            None => self.files_mgr.to_zfile(key.as_str()),
-        };
-
-        match self.files_mgr.read_file(&zfile).await {
-            Ok(Some((value, timestamp))) => {
-                Ok(vec![Sample::new(key, value).with_timestamp(timestamp)])
+    async fn get(
+        &mut self,
+        key: Option<OwnedKeyExpr>,
+        _parameters: &str,
+    ) -> ZResult<Vec<StoredData>> {
+        if key.is_some() {
+            let k = key.clone().unwrap();
+            let k = k.as_str();
+            let zfile = self.files_mgr.to_zfile(k);
+            match self.files_mgr.read_file(&zfile).await {
+                Ok(Some((value, timestamp))) => Ok(vec![StoredData { value, timestamp }]),
+                Ok(None) => Err(format!("File not found for key {:?}", key).into()),
+                Err(e) => {
+                    Err(format!("Get key {:?} : failed to read file {} : {}", key, zfile, e).into())
+                }
             }
-            Ok(None) => Err(format!("File not found for key {}", key).into()),
-            Err(e) => {
-                Err(format!("Get key {} : failed to read file {} : {}", key, zfile, e).into())
+        } else {
+            let zfile = self.files_mgr.to_zfile(NONE_KEY);
+            match self.files_mgr.read_file(&zfile).await {
+                Ok(Some((value, timestamp))) => Ok(vec![StoredData { value, timestamp }]),
+                Ok(None) => Err(format!("File not found for key {:?}", key).into()),
+                Err(e) => {
+                    Err(format!("Get key {:?} : failed to read file {} : {}", key, zfile, e).into())
+                }
             }
         }
     }
 
-    async fn get_all_entries(&self) -> ZResult<Vec<(OwnedKeyExpr, zenoh::time::Timestamp)>> {
+    async fn get_all_entries(&self) -> ZResult<Vec<(Option<OwnedKeyExpr>, Timestamp)>> {
         let mut result = Vec::new();
 
         // get all files in the filesystem
@@ -372,9 +373,10 @@ impl Storage for FileSystemStorage {
             match self.files_mgr.read_file(&trimmed_zfile).await {
                 Ok(Some((_, timestamp))) => {
                     // if strip_prefix is set, prefix it back to the zenoh path of this ZFile
-                    let zpath = match &self.config.strip_prefix {
-                        Some(prefix) => prefix.join(zfile.zpath.as_ref()).unwrap(),
-                        None => zfile.zpath.as_ref().try_into().unwrap(),
+                    let zpath = if zfile.zpath.eq(NONE_KEY) {
+                        None
+                    } else {
+                        Some(zfile.zpath.as_ref().try_into().unwrap())
                     };
                     result.push((zpath, timestamp));
                 }
@@ -384,15 +386,6 @@ impl Storage for FileSystemStorage {
                     zfile, e
                 ),
             }
-        }
-        // get deleted files information from rocksdb
-        for (zpath, ts) in self.files_mgr.get_deleted_entries().await {
-            // if strip_prefix is set, prefix it back to the zenoh path of this ZFile
-            let zpath = match &self.config.strip_prefix {
-                Some(prefix) => prefix.join(&zpath).unwrap(),
-                None => zpath.try_into().unwrap(),
-            };
-            result.push((zpath, ts));
         }
         Ok(result)
     }

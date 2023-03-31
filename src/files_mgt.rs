@@ -364,18 +364,6 @@ impl FilesMgr {
         }
         false
     }
-
-    pub async fn get_deleted_entries(&self) -> Vec<(String, Timestamp)> {
-        let mut result = Vec::new();
-        for (fspath, ts) in self.data_info_mgr.get_deleted_entries().await {
-            // coarse_zpath is the file's absolute path stripped from base_dir and converted as zenoh path
-            let coarse_zpath = fspath_to_zpath(&fspath[self.base_dir.as_os_str().len()..]);
-            // zpath trims away the CONFLICT_SUFFIX if present
-            let zpath = Cow::from(get_trimmed_keyexpr(&coarse_zpath));
-            result.push((zpath.as_ref().to_string(), ts));
-        }
-        result
-    }
 }
 
 impl Drop for FilesMgr {
