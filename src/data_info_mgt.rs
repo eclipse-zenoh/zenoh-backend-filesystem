@@ -12,18 +12,16 @@
 //   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 //
 use async_std::sync::{Arc, Mutex};
-use async_trait::async_trait;
-use log::{trace, warn};
-use rocksdb::{IteratorMode, DB};
+use log::trace;
+use rocksdb::DB;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 use zenoh::buffers::{reader::HasReader, writer::HasWriter};
 use zenoh::prelude::*;
 use zenoh::time::{Timestamp, NTP64};
 use zenoh::Result as ZResult;
 use zenoh_codec::{RCodec, WCodec, Zenoh060};
 use zenoh_core::{bail, zerror};
-use zenoh_util::{Timed, TimedEvent, Timer};
 
 lazy_static::lazy_static! {
     static ref GC_PERIOD: Duration = Duration::new(30, 0);
@@ -33,9 +31,6 @@ lazy_static::lazy_static! {
 pub(crate) struct DataInfoMgr {
     // Note: rocksdb isn't thread-safe. See https://github.com/rust-rocksdb/rust-rocksdb/issues/404
     db: Arc<Mutex<DB>>,
-    // Note: Timer is kept to not be dropped and keep the GC periodic event running
-    #[allow(dead_code)]
-    timer: Timer,
 }
 
 impl DataInfoMgr {
@@ -55,12 +50,7 @@ impl DataInfoMgr {
         })?;
         let db = Arc::new(Mutex::new(db));
 
-        // start periodic GC event
-        let timer = Timer::default();
-        let gc = TimedEvent::periodic(*GC_PERIOD, GarbageCollectionEvent { db: db.clone() });
-        timer.add_async(gc).await;
-
-        Ok(DataInfoMgr { db, timer })
+        Ok(DataInfoMgr { db })
     }
 
     pub(crate) async fn close(&self) -> ZResult<()> {
@@ -97,6 +87,21 @@ impl DataInfoMgr {
             .await
             .put(key.as_bytes(), value)
             .map_err(|e| zerror!("Failed to save data-info for {:?}: {}", file.as_ref(), e).into())
+    }
+
+    pub(crate) async fn del_data_info<P: AsRef<Path>>(&self, file: P) -> ZResult<()> {
+        let key = file.as_ref().to_string_lossy();
+        trace!("Delete data-info for {}", key);
+        let db = self.db.lock().await;
+        match db.delete(key.as_bytes()) {
+            Ok(()) => Ok(()),
+            Err(e) => Err(format!(
+                "Failed to delete data-info for file {:?}: {}",
+                file.as_ref(),
+                e
+            )
+            .into()),
+        }
     }
 
     pub(crate) async fn rename_key<P: AsRef<Path>>(&self, from: P, to: P) -> ZResult<()> {
@@ -140,41 +145,6 @@ impl DataInfoMgr {
             Err(e) => bail!("Failed to get data-info for {:?}: {}", file.as_ref(), e),
         }
     }
-
-    pub(crate) async fn get_timestamp<P: AsRef<Path>>(
-        &self,
-        file: P,
-    ) -> ZResult<Option<Timestamp>> {
-        let key = file.as_ref().to_string_lossy();
-        trace!("Get timestamp for {}", key);
-        match self.db.lock().await.get_pinned(key.as_bytes()) {
-            Ok(Some(pin_val)) => decode_timestamp_from_value(pin_val.as_ref()).map(Some),
-            Ok(None) => {
-                trace!("timestamp for {:?} not found", file.as_ref());
-                Ok(None)
-            }
-            Err(e) => bail!("Failed to get data-info for {:?}: {}", file.as_ref(), e),
-        }
-    }
-
-    pub async fn get_deleted_entries(&self) -> Vec<(String, Timestamp)> {
-        let mut result = Vec::new();
-        let db = self.db.lock().await;
-        for (key, value) in db.iterator(IteratorMode::Start) {
-            if let Ok(path) = std::str::from_utf8(&key).map(Path::new) {
-                if !path.exists() {
-                    match decode_timestamp_from_value(&value) {
-                        Ok(timestamp) => {
-                            result
-                                .push((std::str::from_utf8(&key).unwrap().to_string(), timestamp));
-                        }
-                        Err(e) => warn!("Failed to decode data-info for file {:?}: {}", path, e),
-                    }
-                }
-            }
-        }
-        result
-    }
 }
 
 fn decode_encoding_timestamp_from_value(val: &[u8]) -> ZResult<(Encoding, Timestamp)> {
@@ -187,47 +157,4 @@ fn decode_encoding_timestamp_from_value(val: &[u8]) -> ZResult<(Encoding, Timest
         .read(&mut reader)
         .map_err(|_| zerror!("Failed to decode data-info (encoding)"))?;
     Ok((encoding, timestamp))
-}
-
-fn decode_timestamp_from_value(val: &[u8]) -> ZResult<Timestamp> {
-    let codec = Zenoh060::default();
-    let mut reader = val.reader();
-    let timestamp: Timestamp = codec
-        .read(&mut reader)
-        .map_err(|_| zerror!("Failed to decode data-info (timestamp)"))?;
-    Ok(timestamp)
-}
-
-// Periodic event cleaning-up data info for no-longer existing files
-struct GarbageCollectionEvent {
-    db: Arc<Mutex<DB>>,
-}
-
-#[async_trait]
-impl Timed for GarbageCollectionEvent {
-    async fn run(&mut self) {
-        trace!("Start garbage collection of obsolete data-infos");
-        let time_limit = NTP64::from(SystemTime::now().duration_since(UNIX_EPOCH).unwrap())
-            - *MIN_DELAY_BEFORE_REMOVAL;
-        let db = self.db.lock().await;
-        for (key, value) in db.iterator(IteratorMode::Start) {
-            if let Ok(path) = std::str::from_utf8(&key).map(Path::new) {
-                if !path.exists() {
-                    // check if path was marked as deleted for a long time
-                    match decode_timestamp_from_value(&value) {
-                        Ok(timestamp) => {
-                            if timestamp.get_time() < &time_limit {
-                                trace!("Cleanup old data-info for {:?}", path);
-                                db.delete(&key).unwrap_or_else(|e| {
-                                    warn!("Failed to delete data-info for file {:?}: {}", path, e)
-                                });
-                            }
-                        }
-                        Err(e) => warn!("Failed to decode data-info for file {:?}: {}", path, e),
-                    }
-                }
-            }
-        }
-        trace!("End garbage collection of obsolete data-infos");
-    }
 }

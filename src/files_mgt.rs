@@ -176,11 +176,7 @@ impl FilesMgr {
         }
     }
 
-    pub(crate) async fn delete_file(
-        &self,
-        zfile: &ZFile<'_>,
-        timestamp: &Timestamp,
-    ) -> ZResult<()> {
+    pub(crate) async fn delete_file(&self, zfile: &ZFile<'_>) -> ZResult<()> {
         let file = &zfile.fspath;
 
         let file = if file.exists() && file.is_file() {
@@ -206,9 +202,7 @@ impl FilesMgr {
         }
 
         // save timestamp in data-info (encoding is not used)
-        self.data_info_mgr
-            .put_data_info(file, &KnownEncoding::Empty.into(), timestamp)
-            .await
+        self.data_info_mgr.del_data_info(file).await
     }
 
     // Read a file and return it's content (as Vec<u8>), encoding and timestamp.
@@ -333,23 +327,6 @@ impl FilesMgr {
         }
     }
 
-    pub(crate) async fn get_timestamp(&self, zfile: &ZFile<'_>) -> ZResult<Option<Timestamp>> {
-        let file = &zfile.fspath;
-        // try to get Timestamp from data_info_mgr
-        match self.data_info_mgr.get_timestamp(&file).await? {
-            Some(x) => Ok(Some(x)),
-            None => {
-                // fallback: get timestamp from file's metadata if it exists
-                if file.exists() {
-                    let timestamp = self.get_timestamp_from_metadata(file)?;
-                    Ok(Some(timestamp))
-                } else {
-                    Ok(None)
-                }
-            }
-        }
-    }
-
     fn get_timestamp_from_metadata<P: AsRef<Path>>(&self, file: P) -> ZResult<Timestamp> {
         let metadata = metadata(&file).map_err(|e| {
             zerror!(
@@ -386,18 +363,6 @@ impl FilesMgr {
             current = parent;
         }
         false
-    }
-
-    pub async fn get_deleted_entries(&self) -> Vec<(String, Timestamp)> {
-        let mut result = Vec::new();
-        for (fspath, ts) in self.data_info_mgr.get_deleted_entries().await {
-            // coarse_zpath is the file's absolute path stripped from base_dir and converted as zenoh path
-            let coarse_zpath = fspath_to_zpath(&fspath[self.base_dir.as_os_str().len()..]);
-            // zpath trims away the CONFLICT_SUFFIX if present
-            let zpath = Cow::from(get_trimmed_keyexpr(&coarse_zpath));
-            result.push((zpath.as_ref().to_string(), ts));
-        }
-        result
     }
 }
 
