@@ -13,7 +13,7 @@ services:
       - ./zenoh_filesystem:/filesystem
     environment:
       - RUST_LOG=debug
-      - ZBACKEND_FS_ROOT=/filesystem
+      - zenoh_backend_FS_ROOT=/filesystem
     networks:
       - zenoh-nw
 

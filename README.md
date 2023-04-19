@@ -22,7 +22,7 @@ keys/values publications made via zenoh and return them on queries.
 See the [zenoh documentation](http://zenoh.io/docs/manual/backends/) for more details.
 
 This backend relies on the host's file system to implement the storages.
-Its library name (without OS specific prefix and extension) that zenoh will rely on to find it and load it is **`zbackend_fs`**.
+Its library name (without OS specific prefix and extension) that zenoh will rely on to find it and load it is **`zenoh_backend_fs`**.
 
 
 :point_right: **Install latest release:** see [below](#How-to-install-it)
@@ -41,9 +41,9 @@ For previous versions see the README and code of the corresponding tagged versio
 ## **Examples of usage**
 
 Prerequisites:
- - You have a zenoh router (`zenohd`) installed, and the `zbackend_fs` library file is available in `~/.zenoh/lib`.
- - Declare the `ZBACKEND_FS_ROOT` environment variable to the directory where you want the files to be stored (or exposed from).
-   If you don't declare it, the `~/.zenoh/zbackend_fs` directory will be used.
+ - You have a zenoh router (`zenohd`) installed, and the `zenoh_backend_fs` library file is available in `~/.zenoh/lib`.
+ - Declare the `zenoh_backend_FS_ROOT` environment variable to the directory where you want the files to be stored (or exposed from).
+   If you don't declare it, the `~/.zenoh/zenoh_backend_fs` directory will be used.
 
 You can setup storages either at zenoh router startup via a configuration file, either at runtime via the zenoh admin space, using for instance the REST API.
 ### **Setup via a JSON5 configuration file**
@@ -55,7 +55,7 @@ You can setup storages either at zenoh router startup via a configuration file, 
         // configuration of "storage-manager" plugin:
         storage_manager: {
           volumes: {
-            // configuration of a "fs" volume (the "zbackend_fs" backend library will be loaded at startup)
+            // configuration of a "fs" volume (the "zenoh_backend_fs" backend library will be loaded at startup)
             fs: {},
           },
           storages: {
@@ -68,7 +68,7 @@ You can setup storages either at zenoh router startup via a configuration file, 
               strip_prefix: "demo/example",
               volume: {
                 id: "fs",
-                // the key/values will be stored as files within this directory (relative to ${ZBACKEND_FS_ROOT})
+                // the key/values will be stored as files within this directory (relative to ${zenoh_backend_FS_ROOT})
                 dir: "example"
               }
             }
@@ -86,7 +86,7 @@ You can setup storages either at zenoh router startup via a configuration file, 
 
   - Run the zenoh router, with write permissions to its admin space:
     `zenohd --adminspace-permissions rw`
-  - Add the "fs" backend (the "zbackend_fs" library will be loaded):  
+  - Add the "fs" backend (the "zenoh_backend_fs" library will be loaded):  
     `curl -X PUT -H 'content-type:application/json' -d '{}' http://localhost:8000/@/router/local/config/plugins/storage_manager/volumes/fs`
   - Add the "demo" storage using the "fs" backend:  
     `curl -X PUT -H 'content-type:application/json' -d '{key_expr:"demo/example/**",strip_prefix:"demo/example", volume: {id: "fs", dir:"example"}}' http://localhost:8000/@/router/local/config/plugins/storage_manager/storages/demo`
@@ -95,7 +95,7 @@ You can setup storages either at zenoh router startup via a configuration file, 
 
 Using `curl` to publish and query keys/values, you can:
 ```bash
-# Put values that will be stored under ${ZBACKEND_FS_ROOT}/example
+# Put values that will be stored under ${zenoh_backend_FS_ROOT}/example
 curl -X PUT -d "TEST-1" http://localhost:8000/demo/example/test-1
 curl -X PUT -d "B" http://localhost:8000/demo/example/a/b
 
@@ -108,7 +108,7 @@ curl http://localhost:8000/demo/example/**
 ### **Usage with `eclipse/zenoh` Docker image**
 Alternatively, you can test the zenoh router in a Docker container:
  - Download the [docker-compose.yml](https://github.com/eclipse-zenoh/zenoh-backend-filesystem/blob/master/docker-compose.yml) file
- - In the same directory, create the `./zenoh_docker/lib` sub-directories and place the `libzbackend_fs.so` library
+ - In the same directory, create the `./zenoh_docker/lib` sub-directories and place the `libzenoh_backend_fs.so` library
    for `x86_64-unknown-linux-musl` target within.
  - Also create a `./zenoh_filesystem/test` directory that will be used for the storage.
  - Start the containers running
@@ -148,13 +148,13 @@ Storages relying on a `fs` backed volume must/can specify additional configurati
 ## **Behaviour of the backend**
 
 ### Mapping to file system
-Each **storage** will map to a directory with path: `${ZBACKEND_FS_ROOT}/<dir>`, where:
-  * `${ZBACKEND_FS_ROOT}` is an environment variable that could be specified before zenoh router startup.
-     If this variable is not specified `${ZENOH_HOME}/zbackend_fs` will be used
+Each **storage** will map to a directory with path: `${zenoh_backend_FS_ROOT}/<dir>`, where:
+  * `${zenoh_backend_FS_ROOT}` is an environment variable that could be specified before zenoh router startup.
+     If this variable is not specified `${ZENOH_HOME}/zenoh_backend_fs` will be used
      (where the default value of `${ZENOH_HOME}` is `~/.zenoh`).
   * `<dir>` is the `"dir"` property specified at storage creation.
 Each zenoh **key/value** put into the storage will map to a file within the storage's directory where:
-  * the file path will be `${ZBACKEND_FS_ROOT}/<dir>/<relative_zenoh_key>`, where `<relative_zenoh_key>`
+  * the file path will be `${zenoh_backend_FS_ROOT}/<dir>/<relative_zenoh_key>`, where `<relative_zenoh_key>`
     will be the zenoh key, stripped from the `"strip_prefix"` property specified at storage creation.
   * the content of the file will be the value written as a RawValue. I.e. the same bytes buffer that has been
     transported by zenoh. For UTF-8 compatible formats (StringUTF8, JSon, Integer, Float...) it means the file
