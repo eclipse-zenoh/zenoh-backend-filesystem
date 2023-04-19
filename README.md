@@ -42,7 +42,7 @@ For previous versions see the README and code of the corresponding tagged versio
 
 Prerequisites:
  - You have a zenoh router (`zenohd`) installed, and the `zenoh_backend_fs` library file is available in `~/.zenoh/lib`.
- - Declare the `zenoh_backend_FS_ROOT` environment variable to the directory where you want the files to be stored (or exposed from).
+ - Declare the `ZENOH_BACKEND_FS_ROOT` environment variable to the directory where you want the files to be stored (or exposed from).
    If you don't declare it, the `~/.zenoh/zenoh_backend_fs` directory will be used.
 
 You can setup storages either at zenoh router startup via a configuration file, either at runtime via the zenoh admin space, using for instance the REST API.
@@ -68,7 +68,7 @@ You can setup storages either at zenoh router startup via a configuration file, 
               strip_prefix: "demo/example",
               volume: {
                 id: "fs",
-                // the key/values will be stored as files within this directory (relative to ${zenoh_backend_FS_ROOT})
+                // the key/values will be stored as files within this directory (relative to ${ZENOH_BACKEND_FS_ROOT})
                 dir: "example"
               }
             }
@@ -95,7 +95,7 @@ You can setup storages either at zenoh router startup via a configuration file, 
 
 Using `curl` to publish and query keys/values, you can:
 ```bash
-# Put values that will be stored under ${zenoh_backend_FS_ROOT}/example
+# Put values that will be stored under ${ZENOH_BACKEND_FS_ROOT}/example
 curl -X PUT -d "TEST-1" http://localhost:8000/demo/example/test-1
 curl -X PUT -d "B" http://localhost:8000/demo/example/a/b
 
@@ -148,13 +148,13 @@ Storages relying on a `fs` backed volume must/can specify additional configurati
 ## **Behaviour of the backend**
 
 ### Mapping to file system
-Each **storage** will map to a directory with path: `${zenoh_backend_FS_ROOT}/<dir>`, where:
-  * `${zenoh_backend_FS_ROOT}` is an environment variable that could be specified before zenoh router startup.
+Each **storage** will map to a directory with path: `${ZENOH_BACKEND_FS_ROOT}/<dir>`, where:
+  * `${ZENOH_BACKEND_FS_ROOT}` is an environment variable that could be specified before zenoh router startup.
      If this variable is not specified `${ZENOH_HOME}/zenoh_backend_fs` will be used
      (where the default value of `${ZENOH_HOME}` is `~/.zenoh`).
   * `<dir>` is the `"dir"` property specified at storage creation.
 Each zenoh **key/value** put into the storage will map to a file within the storage's directory where:
-  * the file path will be `${zenoh_backend_FS_ROOT}/<dir>/<relative_zenoh_key>`, where `<relative_zenoh_key>`
+  * the file path will be `${ZENOH_BACKEND_FS_ROOT}/<dir>/<relative_zenoh_key>`, where `<relative_zenoh_key>`
     will be the zenoh key, stripped from the `"strip_prefix"` property specified at storage creation.
   * the content of the file will be the value written as a RawValue. I.e. the same bytes buffer that has been
     transported by zenoh. For UTF-8 compatible formats (StringUTF8, JSon, Integer, Float...) it means the file
