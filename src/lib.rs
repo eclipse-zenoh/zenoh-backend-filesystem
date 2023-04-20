@@ -35,10 +35,10 @@ mod files_mgt;
 use files_mgt::*;
 
 /// The environement variable used to configure the root of all storages managed by this FileSystemBackend.
-pub const SCOPE_ENV_VAR: &str = "ZBACKEND_FS_ROOT";
+pub const SCOPE_ENV_VAR: &str = "ZENOH_BACKEND_FS_ROOT";
 
-/// The default root (whithin zenoh's home directory) if the ZBACKEND_FS_ROOT environment variable is not specified.
-pub const DEFAULT_ROOT_DIR: &str = "zbackend_fs";
+/// The default root (whithin zenoh's home directory) if the ZENOH_BACKEND_FS_ROOT environment variable is not specified.
+pub const DEFAULT_ROOT_DIR: &str = "zenoh_backend_fs";
 
 // Properies used by the Backend
 //  - None

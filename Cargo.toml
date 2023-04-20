@@ -29,7 +29,7 @@ categories = ["network-programming"]
 description = "Backend for Zenoh using the file system"
 
 [lib]
-name = "zbackend_fs"
+name = "zenoh_backend_fs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
