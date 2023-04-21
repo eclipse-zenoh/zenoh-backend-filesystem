@@ -30,14 +30,6 @@ Its library name (without OS specific prefix and extension) that zenoh will rely
 :point_right: **Build "master" branch:** see [below](#How-to-build-it)
 
 -------------------------------
-## :warning: Documentation for previous 0.5 versions:
-The following documentation related to the version currently in development in "master" branch: 0.6.x.
-
-For previous versions see the README and code of the corresponding tagged version:
- - [0.5.0-beta.9](https://github.com/eclipse-zenoh/zenoh-backend-filesystem/tree/0.5.0-beta.9#readme)
- - [0.5.0-beta.8](https://github.com/eclipse-zenoh/zenoh-backend-filesystem/tree/0.5.0-beta.8#readme)
-
--------------------------------
 ## **Examples of usage**
 
 Prerequisites:
@@ -176,7 +168,6 @@ database for a file (e.g. for files created without zenoh), the encoding is dedu
 (using [mime_guess](https://crates.io/crates/mime_guess)), and the timestamp is deduced from the file's
 modification time.
 
-
 -------------------------------
 ## How to install it
 
@@ -197,11 +188,10 @@ Unzip it in the same directory than `zenohd` or to any directory where it can fi
 Add Eclipse Zenoh private repository to the sources list, and install the `zenoh-backend-filesystem` package:
 
 ```bash
-echo "deb [trusted=yes] https://download.eclipse.org/zenoh/debian-repo/ /" | sudo tee -a /etc/apt/sources.list > /dev/null
+echo "deb [trusted=yes] https://download.eclipse.org/zenoh/debian-repo/ /" | sudo tee -a /etc/apt/sources.list.d/zenoh.list > /dev/null
 sudo apt update
 sudo apt install zenoh-backend-filesystem
 ```
-
 
 -------------------------------
 ## How to build it
