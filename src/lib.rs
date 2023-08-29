@@ -14,6 +14,7 @@
 
 use async_trait::async_trait;
 use log::{debug, warn};
+use std::collections::HashMap;
 use std::convert::TryInto;
 use std::io::prelude::*;
 use std::path::PathBuf;
@@ -99,8 +100,7 @@ pub fn create_volume(_unused: VolumeConfig) -> ZResult<Box<dyn Volume>> {
     properties.insert("root".into(), root.to_string_lossy().into());
     properties.insert("version".into(), LONG_VERSION.clone());
 
-    let admin_status = properties
-        .0
+    let admin_status = HashMap::from(properties)
         .into_iter()
         .map(|(k, v)| (k, serde_json::Value::String(v)))
         .collect();
