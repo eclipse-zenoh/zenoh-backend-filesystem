@@ -20,7 +20,7 @@ use zenoh::buffers::{reader::HasReader, writer::HasWriter};
 use zenoh::prelude::*;
 use zenoh::time::{Timestamp, NTP64};
 use zenoh::Result as ZResult;
-use zenoh_codec::{RCodec, WCodec, Zenoh060};
+use zenoh_codec::{RCodec, WCodec, Zenoh080};
 use zenoh_core::{bail, zerror};
 
 lazy_static::lazy_static! {
@@ -73,7 +73,7 @@ impl DataInfoMgr {
         trace!("Put data-info for {}", key);
         let mut value = vec![];
         let mut writer = value.writer();
-        let codec = Zenoh060::default();
+        let codec = Zenoh080::new();
         // note: encode timestamp at first for faster decoding when only this one is required
         codec
             .write(&mut writer, timestamp)
@@ -148,7 +148,7 @@ impl DataInfoMgr {
 }
 
 fn decode_encoding_timestamp_from_value(val: &[u8]) -> ZResult<(Encoding, Timestamp)> {
-    let codec = Zenoh060::default();
+    let codec = Zenoh080::new();
     let mut reader = val.reader();
     let timestamp: Timestamp = codec
         .read(&mut reader)
