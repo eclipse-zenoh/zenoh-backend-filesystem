@@ -51,13 +51,13 @@ serde_json = "1.0.94"
 tempfile = "3.4.0"
 uhlc = "0.5.2"
 walkdir = "2.3.2"
-zenoh = { version = "0.10.0-rc", git = "https://github.com/eclipse-zenoh/zenoh", branch = "release-0.10.0-rc", features = [ "unstable" ] }
-zenoh-codec = {version = "0.10.0-rc", git = "https://github.com/eclipse-zenoh/zenoh", branch = "release-0.10.0-rc" }
-zenoh-collections = { version = "0.10.0-rc", git = "https://github.com/eclipse-zenoh/zenoh", branch = "release-0.10.0-rc" }
-zenoh-core = { version = "0.10.0-rc", git = "https://github.com/eclipse-zenoh/zenoh", branch = "release-0.10.0-rc" }
-zenoh-protocol = { version = "0.10.0-rc", git = "https://github.com/eclipse-zenoh/zenoh", branch = "release-0.10.0-rc" }
-zenoh-util = { version = "0.10.0-rc", git = "https://github.com/eclipse-zenoh/zenoh", branch = "release-0.10.0-rc" }
-zenoh_backend_traits = { version = "0.10.0-rc", git = "https://github.com/eclipse-zenoh/zenoh", branch = "release-0.10.0-rc" }
+zenoh = { version = "0.10.0-rc", features = [ "unstable" ] }
+zenoh-codec = {version = "0.10.0-rc" }
+zenoh-collections = { version = "0.10.0-rc" }
+zenoh-core = { version = "0.10.0-rc" }
+zenoh-protocol = { version = "0.10.0-rc" }
+zenoh-util = { version = "0.10.0-rc" }
+zenoh_backend_traits = { version = "0.10.0-rc" }
 
 [build-dependencies]
 rustc_version = "0.4.0"
