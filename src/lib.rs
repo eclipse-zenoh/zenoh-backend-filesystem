@@ -343,7 +343,7 @@ impl Storage for FileSystemStorage {
             let zfile = self.files_mgr.to_zfile(k);
             match self.files_mgr.read_file(&zfile).await {
                 Ok(Some((value, timestamp))) => Ok(vec![StoredData { value, timestamp }]),
-                Ok(None) => Err(format!("File not found for key {:?}", key).into()),
+                Ok(None) => Ok(vec![]),
                 Err(e) => {
                     Err(format!("Get key {:?} : failed to read file {} : {}", key, zfile, e).into())
                 }
@@ -352,7 +352,7 @@ impl Storage for FileSystemStorage {
             let zfile = self.files_mgr.to_zfile(NONE_KEY);
             match self.files_mgr.read_file(&zfile).await {
                 Ok(Some((value, timestamp))) => Ok(vec![StoredData { value, timestamp }]),
-                Ok(None) => Err(format!("File not found for key {:?}", key).into()),
+                Ok(None) => Ok(vec![]),
                 Err(e) => {
                     Err(format!("Get key {:?} : failed to read file {} : {}", key, zfile, e).into())
                 }
