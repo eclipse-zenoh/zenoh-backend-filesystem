@@ -213,7 +213,7 @@ jobs:
               echo "Packaging ${MAIN_PKG_NAME}:"
               zip ${MAIN_PKG_NAME} *.so
               cd -
-              echo ::set-output name=MAIN_PKG_NAME::"${MAIN_PKG_NAME}"
+              echo "MAIN_PKG_NAME=${MAIN_PKG_NAME}" >> $GITHUB_OUTPUT
 
               # check if debian packages has been created and packages them in a single tgz
               if [[ -d target/${TARGET}/debian ]]; then
@@ -221,7 +221,7 @@ jobs:
                 echo "Packaging ${DEBS_PKG_NAME}:"
                 zip ${DEBS_PKG_NAME} *.deb
                 cd -
-                echo ::set-output name=DEBS_PKG_NAME::"${DEBS_PKG_NAME}"
+                echo "DEBS_PKG_NAME=${DEBS_PKG_NAME}" >> $GITHUB_OUTPUT
               fi
               ;;
             *apple*)
@@ -229,14 +229,14 @@ jobs:
               echo "Packaging ${MAIN_PKG_NAME}:"
               zip ${MAIN_PKG_NAME} *.dylib
               cd -
-              echo ::set-output name=MAIN_PKG_NAME::"${MAIN_PKG_NAME}"
+              echo "MAIN_PKG_NAME=${MAIN_PKG_NAME}" >> $GITHUB_OUTPUT
               ;;
             *windows*)
               cd "target/${TARGET}/release/"
               echo "Packaging ${MAIN_PKG_NAME}:"
               7z -y a "${MAIN_PKG_NAME}"  *.dll
               cd -
-              echo ::set-output name=MAIN_PKG_NAME::"${MAIN_PKG_NAME}"
+              echo "MAIN_PKG_NAME=${MAIN_PKG_NAME}" >> $GITHUB_OUTPUT
               ;;
           esac
 
