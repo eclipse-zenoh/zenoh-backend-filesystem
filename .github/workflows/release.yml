@@ -50,18 +50,18 @@ jobs:
           echo "GITHUB_SHA=${GITHUB_SHA:0:8}"
           GIT_BRANCH=`[[ $GITHUB_REF =~ ^refs/heads/.* ]] && echo ${GITHUB_REF/refs\/heads\//} || true`
           echo "GIT_BRANCH=${GIT_BRANCH}"
-          echo ::set-output name=GIT_BRANCH::"${GIT_BRANCH}"
+          echo "GIT_BRANCH=${GIT_BRANCH}" >> $GITHUB_OUTPUT
           GIT_TAG=`[[ $GITHUB_REF =~ ^refs/tags/.* ]] && echo ${GITHUB_REF/refs\/tags\//} || true`
           echo "GIT_TAG=${GIT_TAG}"
-          echo ::set-output name=GIT_TAG::"${GIT_TAG}"
+          echo "GIT_TAG=${GIT_TAG}" >> $GITHUB_OUTPUT
 
           ZENOH_VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n1)
           echo "ZENOH_VERSION=${ZENOH_VERSION}"
-          echo ::set-output name=ZENOH_VERSION::"${ZENOH_VERSION}"
+          echo "ZENOH_VERSION=${ZENOH_VERSION}" >> $GITHUB_OUTPUT
           if [ -n "${GIT_TAG}" ]; then
             IS_RELEASE="true"
             echo "IS_RELEASE=${IS_RELEASE}"
-            echo ::set-output name=IS_RELEASE::"${IS_RELEASE}"
+            echo "IS_RELEASE=${IS_RELEASE}" >> $GITHUB_OUTPUT
             PKG_VERSION=${ZENOH_VERSION}
           elif [ -n "${GIT_BRANCH}" ]; then
             PKG_VERSION=${GIT_BRANCH}-${GITHUB_SHA:0:8}
@@ -69,7 +69,7 @@ jobs:
             PKG_VERSION=${ZENOH_VERSION}-${GITHUB_SHA:0:8}
           fi
           echo "PKG_VERSION=${PKG_VERSION}"
-          echo ::set-output name=PKG_VERSION::"${PKG_VERSION}"
+          echo "PKG_VERSION=${PKG_VERSION}" >> $GITHUB_OUTPUT
     outputs:
       GIT_BRANCH: ${{ steps.env.outputs.GIT_BRANCH }}
       GIT_TAG: ${{ steps.env.outputs.GIT_TAG }}
@@ -213,7 +213,7 @@ jobs:
               echo "Packaging ${MAIN_PKG_NAME}:"
               zip ${MAIN_PKG_NAME} *.so
               cd -
-              echo ::set-output name=MAIN_PKG_NAME::"${MAIN_PKG_NAME}"
+              echo "MAIN_PKG_NAME=${MAIN_PKG_NAME}" >> $GITHUB_OUTPUT
 
               # check if debian packages has been created and packages them in a single tgz
               if [[ -d target/${TARGET}/debian ]]; then
@@ -221,7 +221,7 @@ jobs:
                 echo "Packaging ${DEBS_PKG_NAME}:"
                 zip ${DEBS_PKG_NAME} *.deb
                 cd -
-                echo ::set-output name=DEBS_PKG_NAME::"${DEBS_PKG_NAME}"
+                echo "DEBS_PKG_NAME=${DEBS_PKG_NAME}" >> $GITHUB_OUTPUT
               fi
               ;;
             *apple*)
@@ -229,14 +229,14 @@ jobs:
               echo "Packaging ${MAIN_PKG_NAME}:"
               zip ${MAIN_PKG_NAME} *.dylib
               cd -
-              echo ::set-output name=MAIN_PKG_NAME::"${MAIN_PKG_NAME}"
+              echo "MAIN_PKG_NAME=${MAIN_PKG_NAME}" >> $GITHUB_OUTPUT
               ;;
             *windows*)
               cd "target/${TARGET}/release/"
               echo "Packaging ${MAIN_PKG_NAME}:"
               7z -y a "${MAIN_PKG_NAME}"  *.dll
               cd -
-              echo ::set-output name=MAIN_PKG_NAME::"${MAIN_PKG_NAME}"
+              echo "MAIN_PKG_NAME=${MAIN_PKG_NAME}" >> $GITHUB_OUTPUT
               ;;
           esac
 
