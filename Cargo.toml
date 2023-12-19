@@ -13,7 +13,7 @@
 #
 [package]
 name = "zenoh-backend-filesystem"
-version = "0.11.0-dev"
+version = "0.10.1-rc"
 repository = "https://github.com/eclipse-zenoh/zenoh-backend-filesystem"
 homepage = "http://zenoh.io"
 authors = [
@@ -51,13 +51,13 @@ serde_json = "1.0.94"
 tempfile = "3.4.0"
 uhlc = "0.5.2"
 walkdir = "2.3.2"
-zenoh = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "master", features = [ "unstable" ] }
-zenoh-codec = {git = "https://github.com/eclipse-zenoh/zenoh", branch = "master" }
-zenoh-collections = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "master" }
-zenoh-core = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "master" }
-zenoh-protocol = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "master" }
-zenoh-util = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "master" }
-zenoh_backend_traits = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "master" }
+zenoh = { version = "0.10.1-rc", git = "https://github.com/eclipse-zenoh/zenoh", branch = "release-0.10.1-rc", features = [ "unstable" ] }
+zenoh-codec = {version = "0.10.1-rc", git = "https://github.com/eclipse-zenoh/zenoh", branch = "release-0.10.1-rc" }
+zenoh-collections = { version = "0.10.1-rc", git = "https://github.com/eclipse-zenoh/zenoh", branch = "release-0.10.1-rc" }
+zenoh-core = { version = "0.10.1-rc", git = "https://github.com/eclipse-zenoh/zenoh", branch = "release-0.10.1-rc" }
+zenoh-protocol = { version = "0.10.1-rc", git = "https://github.com/eclipse-zenoh/zenoh", branch = "release-0.10.1-rc" }
+zenoh-util = { version = "0.10.1-rc", git = "https://github.com/eclipse-zenoh/zenoh", branch = "release-0.10.1-rc" }
+zenoh_backend_traits = { version = "0.10.1-rc", git = "https://github.com/eclipse-zenoh/zenoh", branch = "release-0.10.1-rc" }
 
 [build-dependencies]
 rustc_version = "0.4.0"
@@ -68,4 +68,4 @@ maintainer = "zenoh-dev@eclipse.org"
 copyright = "2022 ZettaScale Technology"
 section = "net"
 license-file = ["LICENSE", "0"]
-depends = "zenoh-plugin-storage-manager  (=0.11.0-dev)"
+depends = "zenoh-plugin-storage-manager  (=0.10.1-rc)"
