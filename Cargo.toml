@@ -51,13 +51,14 @@ serde_json = "1.0.94"
 tempfile = "3.4.0"
 uhlc = "0.5.2"
 walkdir = "2.3.2"
-zenoh = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "master", features = [ "unstable" ] }
-zenoh-codec = {git = "https://github.com/eclipse-zenoh/zenoh", branch = "master" }
-zenoh-collections = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "master" }
-zenoh-core = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "master" }
-zenoh-protocol = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "master" }
-zenoh-util = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "master" }
-zenoh_backend_traits = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "master" }
+zenoh = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "simplified_load_plugin", features = [ "unstable" ] }
+zenoh-codec = {git = "https://github.com/eclipse-zenoh/zenoh", branch = "simplified_load_plugin" }
+zenoh-collections = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "simplified_load_plugin" }
+zenoh-core = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "simplified_load_plugin" }
+zenoh-protocol = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "simplified_load_plugin" }
+zenoh-util = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "simplified_load_plugin" }
+zenoh_backend_traits = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "simplified_load_plugin" }
+zenoh-plugin-trait = { git = "htttps://github.com/eclipse-zenoh/zenoh", branch = "simplified_load_plugin" }
 
 [build-dependencies]
 rustc_version = "0.4.0"
