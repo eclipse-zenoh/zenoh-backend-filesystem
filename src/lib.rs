@@ -14,7 +14,6 @@
 
 use async_trait::async_trait;
 use log::{debug, warn};
-use zenoh_plugin_trait::{Plugin, plugin_version};
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::io::prelude::*;
@@ -25,11 +24,11 @@ use zenoh::prelude::*;
 use zenoh::time::Timestamp;
 use zenoh::Result as ZResult;
 use zenoh_backend_traits::{
-    config::StorageConfig, config::VolumeConfig, Storage, StorageInsertionResult,
-    Volume,
+    config::StorageConfig, config::VolumeConfig, Storage, StorageInsertionResult, Volume,
 };
 use zenoh_backend_traits::{Capability, History, Persistence, StoredData, VolumeInstance};
 use zenoh_core::{bail, zerror};
+use zenoh_plugin_trait::{plugin_version, Plugin};
 use zenoh_util::zenoh_home;
 
 mod data_info_mgt;
