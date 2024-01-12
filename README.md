@@ -1,4 +1,4 @@
-<img src="https://raw.githubusercontent.com/eclipse-zenoh/zenoh/master/zenoh-dragon.png" height="150">
+<img src="https://raw.githubusercontent.com/eclipse-zenoh/zenoh/main/zenoh-dragon.png" height="150">
 
 [![CI](https://github.com/eclipse-zenoh/zenoh-backend-filesystem/workflows/CI/badge.svg)](https://github.com/eclipse-zenoh/zenoh-backend-filesystem/actions?query=workflow%3A%22CI%22)
 [![Discussion](https://img.shields.io/badge/discussion-on%20github-blue)](https://github.com/eclipse-zenoh/roadmap/discussions)
@@ -27,7 +27,7 @@ Its library name (without OS specific prefix and extension) that zenoh will rely
 
 :point_right: **Install latest release:** see [below](#How-to-install-it)
 
-:point_right: **Build "master" branch:** see [below](#How-to-build-it)
+:point_right: **Build "main" branch:** see [below](#How-to-build-it)
 
 -------------------------------
 ## **Examples of usage**
@@ -99,7 +99,7 @@ curl http://localhost:8000/demo/example/**
 
 ### **Usage with `eclipse/zenoh` Docker image**
 Alternatively, you can test the zenoh router in a Docker container:
- - Download the [docker-compose.yml](https://github.com/eclipse-zenoh/zenoh-backend-filesystem/blob/master/docker-compose.yml) file
+ - Download the [docker-compose.yml](https://github.com/eclipse-zenoh/zenoh-backend-filesystem/blob/main/docker-compose.yml) file
  - In the same directory, create the `./zenoh_docker/lib` sub-directories and place the `libzenoh_backend_fs.so` library
    for `x86_64-unknown-linux-musl` target within.
  - Also create a `./zenoh_filesystem/test` directory that will be used for the storage.
