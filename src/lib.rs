@@ -28,7 +28,7 @@ use zenoh_backend_traits::{
 };
 use zenoh_backend_traits::{Capability, History, Persistence, StoredData, VolumeInstance};
 use zenoh_core::{bail, zerror};
-use zenoh_plugin_trait::{plugin_version, Plugin};
+use zenoh_plugin_trait::{plugin_long_version, plugin_version, Plugin};
 use zenoh_util::zenoh_home;
 
 mod data_info_mgt;
@@ -63,6 +63,7 @@ impl Plugin for FileSystemBackend {
 
     const DEFAULT_NAME: &'static str = "filesystem_backend";
     const PLUGIN_VERSION: &'static str = plugin_version!();
+    const PLUGIN_LONG_VERSION: &'static str = plugin_long_version!();
 
     fn start(_name: &str, _config: &Self::StartArgs) -> ZResult<Self::Instance> {
         // For some reasons env_logger is sometime not active in a loaded library.
