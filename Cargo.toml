@@ -51,16 +51,16 @@ serde_json = "1.0.94"
 tempfile = "3.4.0"
 uhlc = "0.5.2"
 walkdir = "2.3.2"
-zenoh = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "main", features = [
-    "unstable",
-] }
-zenoh-codec = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "main" }
-zenoh-collections = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "main" }
-zenoh-core = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "main" }
-zenoh-protocol = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "main" }
-zenoh-util = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "main" }
-zenoh_backend_traits = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "main" }
-zenoh-plugin-trait = { git = "htttps://github.com/eclipse-zenoh/zenoh", branch = "main" }
+zenoh = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main", features = ["unstable"] }
+zenoh-codec = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
+zenoh-collections = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
+zenoh-core = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
+zenoh-protocol = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
+zenoh-util = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
+zenoh_backend_traits = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
+zenoh-plugin-trait = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
+
+
 
 [build-dependencies]
 rustc_version = "0.4.0"
