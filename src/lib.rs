@@ -24,11 +24,11 @@ use zenoh::prelude::*;
 use zenoh::time::Timestamp;
 use zenoh::Result as ZResult;
 use zenoh_backend_traits::{
-    config::StorageConfig, config::VolumeConfig, CreateVolume, Storage, StorageInsertionResult,
-    Volume,
+    config::StorageConfig, config::VolumeConfig, Storage, StorageInsertionResult, Volume,
 };
-use zenoh_backend_traits::{Capability, History, Persistence, StoredData};
+use zenoh_backend_traits::{Capability, History, Persistence, StoredData, VolumeInstance};
 use zenoh_core::{bail, zerror};
+use zenoh_plugin_trait::{plugin_long_version, plugin_version, Plugin};
 use zenoh_util::zenoh_home;
 
 mod data_info_mgt;
@@ -54,60 +54,62 @@ pub const PROP_STORAGE_KEEP_MIME: &str = "keep_mime_types";
 // Special key for None (when the prefix being stripped exactly matches the key)
 pub const NONE_KEY: &str = "@@none_key@@";
 
-const GIT_VERSION: &str = git_version::git_version!(prefix = "v", cargo_prefix = "v");
-lazy_static::lazy_static!(
-    static ref LONG_VERSION: String = format!("{} built with {}", GIT_VERSION, env!("RUSTC_VERSION"));
-);
+pub struct FileSystemBackend {}
+zenoh_plugin_trait::declare_plugin!(FileSystemBackend);
 
-#[allow(dead_code)]
-/// Serves as typecheck for the create_backend function, ensuring it has the expected signature
-const CREATE_VOLUME_TYPECHECK: CreateVolume = create_volume;
+impl Plugin for FileSystemBackend {
+    type StartArgs = VolumeConfig;
+    type Instance = VolumeInstance;
 
-#[no_mangle]
-pub fn create_volume(_unused: VolumeConfig) -> ZResult<Box<dyn Volume>> {
-    // For some reasons env_logger is sometime not active in a loaded library.
-    // Try to activate it here, ignoring failures.
-    let _ = env_logger::try_init();
-    debug!("FileSystem backend {}", LONG_VERSION.as_str());
+    const DEFAULT_NAME: &'static str = "filesystem_backend";
+    const PLUGIN_VERSION: &'static str = plugin_version!();
+    const PLUGIN_LONG_VERSION: &'static str = plugin_long_version!();
 
-    let root_path = if let Some(dir) = std::env::var_os(SCOPE_ENV_VAR) {
-        PathBuf::from(dir)
-    } else {
-        let mut dir = PathBuf::from(zenoh_home());
-        dir.push(DEFAULT_ROOT_DIR);
-        dir
-    };
-    if let Err(e) = std::fs::create_dir_all(&root_path) {
-        bail!(
-            r#"Failed to create directory ${{{}}}={}: {}"#,
-            SCOPE_ENV_VAR,
-            root_path.display(),
-            e
-        );
+    fn start(_name: &str, _config: &Self::StartArgs) -> ZResult<Self::Instance> {
+        // For some reasons env_logger is sometime not active in a loaded library.
+        // Try to activate it here, ignoring failures.
+        let _ = env_logger::try_init();
+        debug!("FileSystem backend {}", Self::PLUGIN_VERSION);
+
+        let root_path = if let Some(dir) = std::env::var_os(SCOPE_ENV_VAR) {
+            PathBuf::from(dir)
+        } else {
+            let mut dir = PathBuf::from(zenoh_home());
+            dir.push(DEFAULT_ROOT_DIR);
+            dir
+        };
+        if let Err(e) = std::fs::create_dir_all(&root_path) {
+            bail!(
+                r#"Failed to create directory ${{{}}}={}: {}"#,
+                SCOPE_ENV_VAR,
+                root_path.display(),
+                e
+            );
+        }
+        let root = match dunce::canonicalize(&root_path) {
+            Ok(dir) => dir,
+            Err(e) => bail!(
+                r#"Invalid path for ${{{}}}={}: {}"#,
+                SCOPE_ENV_VAR,
+                root_path.display(),
+                e
+            ),
+        };
+        debug!("Using root dir: {}", root.display());
+
+        let mut properties = zenoh::properties::Properties::default();
+        properties.insert("root".into(), root.to_string_lossy().into());
+        properties.insert("version".into(), Self::PLUGIN_VERSION.into());
+
+        let admin_status = HashMap::from(properties)
+            .into_iter()
+            .map(|(k, v)| (k, serde_json::Value::String(v)))
+            .collect();
+        Ok(Box::new(FileSystemVolume { admin_status, root }))
     }
-    let root = match dunce::canonicalize(&root_path) {
-        Ok(dir) => dir,
-        Err(e) => bail!(
-            r#"Invalid path for ${{{}}}={}: {}"#,
-            SCOPE_ENV_VAR,
-            root_path.display(),
-            e
-        ),
-    };
-    debug!("Using root dir: {}", root.display());
-
-    let mut properties = zenoh::properties::Properties::default();
-    properties.insert("root".into(), root.to_string_lossy().into());
-    properties.insert("version".into(), LONG_VERSION.clone());
-
-    let admin_status = HashMap::from(properties)
-        .into_iter()
-        .map(|(k, v)| (k, serde_json::Value::String(v)))
-        .collect();
-    Ok(Box::new(FileSystemBackend { admin_status, root }))
 }
 
-pub struct FileSystemBackend {
+pub struct FileSystemVolume {
     admin_status: serde_json::Value,
     root: PathBuf,
 }
@@ -128,7 +130,7 @@ fn extract_bool(
 }
 
 #[async_trait]
-impl Volume for FileSystemBackend {
+impl Volume for FileSystemVolume {
     fn get_admin_status(&self) -> serde_json::Value {
         self.admin_status.clone()
     }
@@ -141,7 +143,7 @@ impl Volume for FileSystemBackend {
         }
     }
 
-    async fn create_storage(&mut self, mut config: StorageConfig) -> ZResult<Box<dyn Storage>> {
+    async fn create_storage(&self, mut config: StorageConfig) -> ZResult<Box<dyn Storage>> {
         let volume_cfg = match config.volume_cfg.as_object() {
             Some(v) => v,
             None => bail!("fs backed volumes require volume-specific configuration"),
