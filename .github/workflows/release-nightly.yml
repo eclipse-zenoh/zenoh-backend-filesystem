@@ -11,24 +11,11 @@
 # Contributors:
 #   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 #
-name: Release
+name: Release (nightly)
 
 on:
-  workflow_dispatch:
-    inputs:
-      live-run:
-        type: boolean
-        description: Whether to run with side-effects
-        required: false
-        default: false
-      version:
-        type: string
-        description: Release number
-        required: true
-      zenoh-version:
-        type: string
-        description: Zenoh Release number
-        required: false
+  schedule:
+    - cron: "0 0 * * 1-5"
 
 jobs:
   tag:
@@ -36,11 +23,8 @@ jobs:
     uses: eclipse-zenoh/ci/.github/workflows/branch-bump-tag-crates.yml@main
     with:
       repo: ${{ github.repository }}
-      live-run: ${{ inputs.live-run }}
-      version: ${{ inputs.version }}
-      bump-deps-version: ${{ inputs.zenoh-version }}
-      bump-deps-pattern: ${{ inputs.zenoh-version && 'zenoh.*' || '^$' }}
-      bump-deps-branch: ${{ inputs.zenoh-version && format('release/{0}', inputs.zenoh-version) || '' }}
+      live-run: false
+      bump-deps-pattern: ^$
     secrets: inherit
 
   build-debian:
@@ -72,15 +56,15 @@ jobs:
     uses: eclipse-zenoh/ci/.github/workflows/release-crates-cargo.yml@main
     with:
       repo: ${{ github.repository }}
-      live-run: ${{ inputs.live-run }}
+      live-run: false
       branch: ${{ needs.tag.outputs.branch }}
       # - In dry-run mode, we need to publish eclipse-zenoh/zenoh before this
       #   repository, in which case the version of zenoh dependecies are left as
       #   is and thus point to the main branch of eclipse-zenoh/zenoh.
       # - In live-run mode, we assume that eclipse-zenoh/zenoh is already
       #   published as this workflow can't be responsible for publishing it
-      unpublished-deps-patterns: ${{ !inputs.live-run && 'zenoh.*' || '' }}
-      unpublished-deps-repos: ${{ !inputs.live-run && 'eclipse-zenoh/zenoh' || '' }}
+      unpublished-deps-patterns: "zenoh.*"
+      unpublished-deps-repos: "eclipse-zenoh/zenoh"
     secrets: inherit
 
   debian:
@@ -89,7 +73,7 @@ jobs:
     uses: eclipse-zenoh/ci/.github/workflows/release-crates-debian.yml@main
     with:
       no-build: true
-      live-run: ${{ inputs.live-run }}
+      live-run: false
       version: ${{ needs.tag.outputs.version }}
       repo: ${{ github.repository }}
       branch: ${{ needs.tag.outputs.branch }}
@@ -103,7 +87,7 @@ jobs:
     with:
       no-build: true
       repo: ${{ github.repository }}
-      live-run: ${{ inputs.live-run }}
+      live-run: false
       version: ${{ needs.tag.outputs.version }}
       branch: ${{ needs.tag.outputs.branch }}
       artifact-patterns: |
@@ -118,7 +102,7 @@ jobs:
     uses: eclipse-zenoh/ci/.github/workflows/release-crates-eclipse.yml@main
     with:
       no-build: true
-      live-run: ${{ inputs.live-run }}
+      live-run: false
       version: ${{ needs.tag.outputs.version }}
       repo: ${{ github.repository }}
       branch: ${{ needs.tag.outputs.branch }}
@@ -134,7 +118,7 @@ jobs:
     uses: eclipse-zenoh/ci/.github/workflows/release-crates-github.yml@main
     with:
       no-build: true
-      live-run: ${{ inputs.live-run }}
+      live-run: false
       version: ${{ needs.tag.outputs.version }}
       repo: ${{ github.repository }}
       branch: ${{ needs.tag.outputs.branch }}
