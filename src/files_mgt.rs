@@ -12,7 +12,6 @@
 //   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 //
 use async_std::task;
-use log::{debug, trace, warn};
 use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::fmt;
@@ -21,6 +20,7 @@ use std::io::prelude::*;
 use std::iter::Iterator;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
+use tracing::{debug, trace, warn};
 use walkdir::{IntoIter, WalkDir};
 use zenoh::buffers::ZBuf;
 use zenoh::prelude::*;
@@ -419,7 +419,7 @@ impl<'a> Iterator for FilesIterator<'a> {
                             let zpath_as_ke = match keyexpr::new(zpath) {
                                 Ok(ke) => ke,
                                 Err(e) => {
-                                    log::error!(
+                                    tracing::error!(
                                         "Couldn't convert `{}` into a key expression: {}",
                                         &zpath,
                                         e

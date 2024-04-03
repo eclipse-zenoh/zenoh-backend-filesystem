@@ -13,13 +13,13 @@
 //
 
 use async_trait::async_trait;
-use log::{debug, warn};
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::io::prelude::*;
 use std::path::PathBuf;
 use std::{fs::DirBuilder, sync::Arc};
 use tempfile::tempfile_in;
+use tracing::{debug, warn};
 use zenoh::prelude::*;
 use zenoh::time::Timestamp;
 use zenoh::Result as ZResult;
@@ -66,9 +66,7 @@ impl Plugin for FileSystemBackend {
     const PLUGIN_LONG_VERSION: &'static str = plugin_long_version!();
 
     fn start(_name: &str, _config: &Self::StartArgs) -> ZResult<Self::Instance> {
-        // For some reasons env_logger is sometime not active in a loaded library.
-        // Try to activate it here, ignoring failures.
-        let _ = env_logger::try_init();
+        zenoh_util::init_log();
         debug!("FileSystem backend {}", Self::PLUGIN_VERSION);
 
         let root_path = if let Some(dir) = std::env::var_os(SCOPE_ENV_VAR) {
@@ -238,7 +236,7 @@ impl Volume for FileSystemVolume {
             .unwrap()
             .insert("dir_full_path".into(), base_dir.to_string_lossy().into());
 
-        log::debug!(
+        tracing::debug!(
             "Storage on {} will store files in {}",
             config.key_expr,
             base_dir.display()

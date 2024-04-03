@@ -39,26 +39,25 @@ stats = ["zenoh/stats"]
 async-std = "=1.12.0"
 async-trait = "0.1.66"
 dunce = "1.0.3"
-env_logger = "0.10.0"
 git-version = "0.3.5"
 home = "0.5.4"
 lazy_static = "1.4.0"
-log = "0.4.17"
 mime_guess = "2.0.4"
 regex = "1.7.1"
 rocksdb = "0.20.1"
 serde_json = "1.0.94"
 tempfile = "3.4.0"
+tracing = "0.1"
 uhlc = "0.5.2"
 walkdir = "2.3.2"
-zenoh = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main", features = ["unstable"] }
-zenoh-codec = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
-zenoh-collections = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
-zenoh-core = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
-zenoh-protocol = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
-zenoh-util = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
-zenoh_backend_traits = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
-zenoh-plugin-trait = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
+zenoh = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "feat/tracing", features = ["unstable"] }
+zenoh-codec = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "feat/tracing" }
+zenoh-collections = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "feat/tracing" }
+zenoh-core = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "feat/tracing" }
+zenoh-protocol = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "feat/tracing" }
+zenoh-util = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "feat/tracing" }
+zenoh_backend_traits = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "feat/tracing" }
+zenoh-plugin-trait = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "feat/tracing" }
 
 
 
