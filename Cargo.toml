@@ -50,14 +50,14 @@ tempfile = "3.4.0"
 tracing = "0.1"
 uhlc = "0.5.2"
 walkdir = "2.3.2"
-zenoh = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "feat/tracing", features = ["unstable"] }
-zenoh-codec = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "feat/tracing" }
-zenoh-collections = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "feat/tracing" }
-zenoh-core = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "feat/tracing" }
-zenoh-protocol = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "feat/tracing" }
-zenoh-util = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "feat/tracing" }
-zenoh_backend_traits = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "feat/tracing" }
-zenoh-plugin-trait = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "feat/tracing" }
+zenoh = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main", features = ["unstable"] }
+zenoh-codec = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
+zenoh-collections = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
+zenoh-core = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
+zenoh-protocol = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
+zenoh-util = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
+zenoh_backend_traits = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
+zenoh-plugin-trait = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
 
 
 
