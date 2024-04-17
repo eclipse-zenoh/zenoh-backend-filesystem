@@ -12,10 +12,10 @@
 //   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 //
 use async_std::sync::{Arc, Mutex};
-use log::trace;
 use rocksdb::DB;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
+use tracing::trace;
 use zenoh::buffers::{reader::HasReader, writer::HasWriter};
 use zenoh::prelude::*;
 use zenoh::time::{Timestamp, NTP64};
