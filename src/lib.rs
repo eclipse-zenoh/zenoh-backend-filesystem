@@ -66,7 +66,7 @@ impl Plugin for FileSystemBackend {
     const PLUGIN_LONG_VERSION: &'static str = plugin_long_version!();
 
     fn start(_name: &str, _config: &Self::StartArgs) -> ZResult<Self::Instance> {
-        zenoh_util::init_log_from_env();
+        zenoh_util::try_init_log_from_env();
         debug!("FileSystem backend {}", Self::PLUGIN_VERSION);
 
         let root_path = if let Some(dir) = std::env::var_os(SCOPE_ENV_VAR) {
