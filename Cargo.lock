@@ -2966,7 +2966,7 @@ dependencies = [
 
 [[package]]
 name = "zenoh-backend-filesystem"
-version = "0.11.0-dev"
+version = "0.11.0-dev-82-g9fe550a"
 dependencies = [
  "async-std",
  "async-trait",
