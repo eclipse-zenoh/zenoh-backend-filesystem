@@ -374,7 +374,7 @@ impl Storage for FileSystemStorage {
             result.push((None, timestamp));
         }
         // Get all files in the filesystem.
-        // Also skip the root key file which was already added above. 
+        // Also skip the root key file which was already added above.
         // This is just for completeness, currently it's skipped anyway due to it's name with '@'
         for zfile in self
             .files_mgr
