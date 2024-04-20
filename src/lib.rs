@@ -362,7 +362,14 @@ impl Storage for FileSystemStorage {
 
     async fn get_all_entries(&self) -> ZResult<Vec<(Option<OwnedKeyExpr>, Timestamp)>> {
         let mut result = Vec::new();
-
+        // add the root entry if it exists
+        if let Some((_, timestamp)) = self
+            .files_mgr
+            .read_file(&self.files_mgr.to_zfile(NONE_KEY))
+            .await?
+        {
+            result.push((None, timestamp));
+        }
         // get all files in the filesystem
         for zfile in self
             .files_mgr
