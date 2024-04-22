@@ -52,7 +52,7 @@ pub const PROP_STORAGE_FOLLOW_LINK: &str = "follow_links";
 pub const PROP_STORAGE_KEEP_MIME: &str = "keep_mime_types";
 
 // Special key for None (when the prefix being stripped exactly matches the key)
-pub const NONE_KEY: &str = "@@none_key@@";
+pub const ROOT_KEY: &str = "@root";
 
 pub struct FileSystemBackend {}
 zenoh_plugin_trait::declare_plugin!(FileSystemBackend);
@@ -287,7 +287,7 @@ impl Storage for FileSystemStorage {
                     .await?;
                 Ok(StorageInsertionResult::Inserted)
             } else {
-                let zfile = self.files_mgr.to_zfile(NONE_KEY);
+                let zfile = self.files_mgr.to_zfile(ROOT_KEY);
                 // write file
                 self.files_mgr
                     .write_file(&zfile, value.payload, &value.encoding, &timestamp)
@@ -317,7 +317,7 @@ impl Storage for FileSystemStorage {
                 self.files_mgr.delete_file(&zfile).await?;
                 Ok(StorageInsertionResult::Deleted)
             } else {
-                let zfile = self.files_mgr.to_zfile(NONE_KEY);
+                let zfile = self.files_mgr.to_zfile(ROOT_KEY);
                 // delete file
                 self.files_mgr.delete_file(&zfile).await?;
                 Ok(StorageInsertionResult::Deleted)
@@ -349,7 +349,7 @@ impl Storage for FileSystemStorage {
                 }
             }
         } else {
-            let zfile = self.files_mgr.to_zfile(NONE_KEY);
+            let zfile = self.files_mgr.to_zfile(ROOT_KEY);
             match self.files_mgr.read_file(&zfile).await {
                 Ok(Some((value, timestamp))) => Ok(vec![StoredData { value, timestamp }]),
                 Ok(None) => Ok(vec![]),
@@ -362,22 +362,29 @@ impl Storage for FileSystemStorage {
 
     async fn get_all_entries(&self) -> ZResult<Vec<(Option<OwnedKeyExpr>, Timestamp)>> {
         let mut result = Vec::new();
-
-        // get all files in the filesystem
+        // Add the root entry if it exists.
+        // Root key can't be acuired from `matching_files` call
+        // because it's name is specially chosen to be not allowed as key value ("@root")
+        if let Some((_, timestamp)) = self
+            .files_mgr
+            .read_file(&self.files_mgr.to_zfile(ROOT_KEY))
+            .await?
+        {
+            result.push((None, timestamp));
+        }
+        // Get all files in the filesystem.
+        // Also skip the root key file which was already added above.
+        // This is just for completeness, it's skipped anyway due to it's name starting from '@'
         for zfile in self
             .files_mgr
             .matching_files(unsafe { keyexpr::from_str_unchecked("**") })
+            .filter(|zfile| zfile.zpath != ROOT_KEY)
         {
             let trimmed_zpath = get_trimmed_keyexpr(zfile.zpath.as_ref());
             let trimmed_zfile = self.files_mgr.to_zfile(trimmed_zpath);
             match self.files_mgr.read_file(&trimmed_zfile).await {
                 Ok(Some((_, timestamp))) => {
-                    // if strip_prefix is set, prefix it back to the zenoh path of this ZFile
-                    let zpath = if zfile.zpath.eq(NONE_KEY) {
-                        None
-                    } else {
-                        Some(zfile.zpath.as_ref().try_into().unwrap())
-                    };
+                    let zpath = Some(zfile.zpath.as_ref().try_into().unwrap());
                     result.push((zpath, timestamp));
                 }
                 Ok(None) => (), // file not found, do nothing
