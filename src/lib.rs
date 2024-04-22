@@ -363,7 +363,7 @@ impl Storage for FileSystemStorage {
     async fn get_all_entries(&self) -> ZResult<Vec<(Option<OwnedKeyExpr>, Timestamp)>> {
         let mut result = Vec::new();
         // Add the root entry if it exists.
-        // Root key can't be acuired from `matching_files` call 
+        // Root key can't be acuired from `matching_files` call
         // because it's name is specially chosen to be not allowed as key value ("@root")
         if let Some((_, timestamp)) = self
             .files_mgr
