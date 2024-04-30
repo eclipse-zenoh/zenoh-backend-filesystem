@@ -50,14 +50,14 @@ tempfile = "3.4.0"
 tracing = "0.1"
 uhlc = "0.5.2"
 walkdir = "2.3.2"
-zenoh = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main", features = ["unstable"] }
-zenoh-codec = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
-zenoh-collections = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
-zenoh-core = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
-zenoh-protocol = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
-zenoh-util = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
-zenoh_backend_traits = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
-zenoh-plugin-trait = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
+zenoh = { version = "0.11.0-rc.2", features = ["unstable"] }
+zenoh-codec = { version = "0.11.0-rc.2"}
+zenoh-collections = { version = "0.11.0-rc.2"}
+zenoh-core = { version = "0.11.0-rc.2"}
+zenoh-protocol = { version = "0.11.0-rc.2"}
+zenoh-util = { version = "0.11.0-rc.2"}
+zenoh_backend_traits = { version = "0.11.0-rc.2"}
+zenoh-plugin-trait = { version = "0.11.0-rc.2"}
 
 
 
@@ -70,4 +70,4 @@ maintainer = "zenoh-dev@eclipse.org"
 copyright = "2022 ZettaScale Technology"
 section = "net"
 license-file = ["LICENSE", "0"]
-depends = "zenoh-plugin-storage-manager (=0.11.0-dev-1)"
+depends = "zenoh-plugin-storage-manager (=0.11.0-rc.2)"
