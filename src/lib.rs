@@ -55,6 +55,8 @@ pub const PROP_STORAGE_KEEP_MIME: &str = "keep_mime_types";
 pub const ROOT_KEY: &str = "@root";
 
 pub struct FileSystemBackend {}
+
+#[cfg(feature = "dynamic_plugin")]
 zenoh_plugin_trait::declare_plugin!(FileSystemBackend);
 
 impl Plugin for FileSystemBackend {
