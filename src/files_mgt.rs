@@ -22,11 +22,14 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::{debug, trace, warn};
 use walkdir::{IntoIter, WalkDir};
-use zenoh::buffers::ZBuf;
-use zenoh::prelude::*;
+use zenoh::encoding::Encoding;
 use zenoh::time::{Timestamp, TimestampId};
+use zenoh::value::Value;
 use zenoh::Result as ZResult;
+use zenoh_buffers::buffer::SplitBuffer;
+use zenoh_buffers::ZBuf;
 use zenoh_core::{bail, zerror};
+use zenoh_keyexpr::keyexpr;
 
 use crate::data_info_mgt::*;
 
@@ -107,7 +110,7 @@ impl FilesMgr {
         &self,
         zfile: &ZFile<'_>,
         content: ZBuf,
-        encoding: &Encoding,
+        encoding: Encoding,
         timestamp: &Timestamp,
     ) -> ZResult<()> {
         let file = &zfile.fspath;
@@ -136,7 +139,7 @@ impl FilesMgr {
                         // fallback: get encoding and timestamp from file's metadata
                         let (a_encoding, a_timestamp) = self.generate_metadata(a, timestamp);
                         self.data_info_mgr
-                            .put_data_info(file, &a_encoding, &a_timestamp)
+                            .put_data_info(file, a_encoding, &a_timestamp)
                             .await
                             .ok()
                     }
@@ -239,10 +242,7 @@ impl FilesMgr {
                         } else {
                             let (encoding, timestamp) =
                                 self.get_encoding_and_timestamp(file).await?;
-                            Ok(Some((
-                                Value::new(content.into()).encoding(encoding),
-                                timestamp,
-                            )))
+                            Ok(Some((Value::new(content, encoding), timestamp)))
                         }
                     } else {
                         bail!(r#"Error reading file {:?}: too big to fit in memory"#, file)
@@ -323,7 +323,7 @@ impl FilesMgr {
             let mime_type = mime_guess::from_path(file).first_or_octet_stream();
             Encoding::from(mime_type.essence_str().to_string())
         } else {
-            KnownEncoding::AppOctetStream.into()
+            Encoding::APPLICATION_OCTET_STREAM.into()
         }
     }
 

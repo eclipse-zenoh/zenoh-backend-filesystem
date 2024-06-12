@@ -16,10 +16,10 @@ use rocksdb::DB;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tracing::trace;
-use zenoh::buffers::{reader::HasReader, writer::HasWriter};
-use zenoh::prelude::*;
+use zenoh::encoding::Encoding;
 use zenoh::time::{Timestamp, NTP64};
 use zenoh::Result as ZResult;
+use zenoh_buffers::{reader::HasReader, writer::HasWriter};
 use zenoh_codec::{RCodec, WCodec, Zenoh080};
 use zenoh_core::{bail, zerror};
 
@@ -64,7 +64,7 @@ impl DataInfoMgr {
     pub(crate) async fn put_data_info<P: AsRef<Path>>(
         &self,
         file: P,
-        encoding: &Encoding,
+        encoding: Encoding,
         timestamp: &Timestamp,
     ) -> ZResult<()> {
         const ERR: &str = "Failed to encode data-info for";
@@ -79,7 +79,7 @@ impl DataInfoMgr {
             .write(&mut writer, timestamp)
             .map_err(|_| zerror!("{} {:?}", ERR, file.as_ref()))?;
         codec
-            .write(&mut writer, encoding)
+            .write(&mut writer, &zenoh_protocol::core::Encoding::from(encoding))
             .map_err(|_| zerror!("{} {:?}", ERR, file.as_ref()))?;
 
         self.db
@@ -153,8 +153,9 @@ fn decode_encoding_timestamp_from_value(val: &[u8]) -> ZResult<(Encoding, Timest
     let timestamp: Timestamp = codec
         .read(&mut reader)
         .map_err(|_| zerror!("Failed to decode data-info (timestamp)"))?;
-    let encoding: Encoding = codec
+
+    let encoding: zenoh_protocol::core::Encoding = codec
         .read(&mut reader)
         .map_err(|_| zerror!("Failed to decode data-info (encoding)"))?;
-    Ok((encoding, timestamp))
+    Ok((encoding.into(), timestamp))
 }

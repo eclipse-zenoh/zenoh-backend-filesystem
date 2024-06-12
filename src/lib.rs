@@ -14,21 +14,22 @@
 
 use async_trait::async_trait;
 use std::collections::HashMap;
-use std::convert::TryInto;
+use std::fs::DirBuilder;
 use std::io::prelude::*;
 use std::path::PathBuf;
-use std::{fs::DirBuilder, sync::Arc};
 use tempfile::tempfile_in;
 use tracing::{debug, warn};
-use zenoh::prelude::*;
 use zenoh::time::Timestamp;
+use zenoh::value::Value;
 use zenoh::Result as ZResult;
 use zenoh_backend_traits::{
     config::StorageConfig, config::VolumeConfig, Storage, StorageInsertionResult, Volume,
 };
 use zenoh_backend_traits::{Capability, History, Persistence, StoredData, VolumeInstance};
 use zenoh_core::{bail, zerror};
+use zenoh_keyexpr::{keyexpr, OwnedKeyExpr};
 use zenoh_plugin_trait::{plugin_long_version, plugin_version, Plugin};
+use zenoh_protocol::core::Properties;
 use zenoh_util::zenoh_home;
 
 mod data_info_mgt;
@@ -97,9 +98,9 @@ impl Plugin for FileSystemBackend {
         };
         debug!("Using root dir: {}", root.display());
 
-        let mut properties = zenoh::properties::Properties::default();
-        properties.insert("root".into(), root.to_string_lossy().into());
-        properties.insert("version".into(), Self::PLUGIN_VERSION.into());
+        let mut properties = Properties::default();
+        properties.insert::<String, String>("root".into(), root.to_string_lossy().into());
+        properties.insert::<String, String>("version".into(), Self::PLUGIN_VERSION.into());
 
         let admin_status = HashMap::from(properties)
             .into_iter()
@@ -251,14 +252,6 @@ impl Volume for FileSystemVolume {
             read_only,
         }))
     }
-
-    fn incoming_data_interceptor(&self) -> Option<Arc<dyn Fn(Sample) -> Sample + Sync + Send>> {
-        None
-    }
-
-    fn outgoing_data_interceptor(&self) -> Option<Arc<dyn Fn(Sample) -> Sample + Sync + Send>> {
-        None
-    }
 }
 
 struct FileSystemStorage {
@@ -285,14 +278,24 @@ impl Storage for FileSystemStorage {
                 let zfile = self.files_mgr.to_zfile(k);
                 // write file
                 self.files_mgr
-                    .write_file(&zfile, value.payload, &value.encoding, &timestamp)
+                    .write_file(
+                        &zfile,
+                        value.payload().into(),
+                        value.encoding().clone(),
+                        &timestamp,
+                    )
                     .await?;
                 Ok(StorageInsertionResult::Inserted)
             } else {
                 let zfile = self.files_mgr.to_zfile(ROOT_KEY);
                 // write file
                 self.files_mgr
-                    .write_file(&zfile, value.payload, &value.encoding, &timestamp)
+                    .write_file(
+                        &zfile,
+                        value.payload().into(),
+                        value.encoding().clone(),
+                        &timestamp,
+                    )
                     .await?;
                 Ok(StorageInsertionResult::Inserted)
             }
