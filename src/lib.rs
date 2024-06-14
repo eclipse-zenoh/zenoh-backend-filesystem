@@ -19,8 +19,8 @@ use std::io::prelude::*;
 use std::path::PathBuf;
 use tempfile::tempfile_in;
 use tracing::{debug, warn};
+use zenoh::internal::Value;
 use zenoh::time::Timestamp;
-use zenoh::value::Value;
 use zenoh::Result as ZResult;
 use zenoh_backend_traits::{
     config::StorageConfig, config::VolumeConfig, Storage, StorageInsertionResult, Volume,
@@ -29,7 +29,7 @@ use zenoh_backend_traits::{Capability, History, Persistence, StoredData, VolumeI
 use zenoh_core::{bail, zerror};
 use zenoh_keyexpr::{keyexpr, OwnedKeyExpr};
 use zenoh_plugin_trait::{plugin_long_version, plugin_version, Plugin};
-use zenoh_protocol::core::Properties;
+use zenoh_protocol::core::Parameters;
 use zenoh_util::zenoh_home;
 
 mod data_info_mgt;
@@ -98,11 +98,11 @@ impl Plugin for FileSystemBackend {
         };
         debug!("Using root dir: {}", root.display());
 
-        let mut properties = Properties::default();
-        properties.insert::<String, String>("root".into(), root.to_string_lossy().into());
-        properties.insert::<String, String>("version".into(), Self::PLUGIN_VERSION.into());
+        let mut parameters = Parameters::default();
+        parameters.insert::<String, String>("root".into(), root.to_string_lossy().into());
+        parameters.insert::<String, String>("version".into(), Self::PLUGIN_VERSION.into());
 
-        let admin_status = HashMap::from(properties)
+        let admin_status = HashMap::from(parameters)
             .into_iter()
             .map(|(k, v)| (k, serde_json::Value::String(v)))
             .collect();

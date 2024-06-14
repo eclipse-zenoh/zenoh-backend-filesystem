@@ -54,6 +54,7 @@ uhlc = "0.5.2"
 walkdir = "2.3.2"
 zenoh = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "dev/1.0.0", features = [
     "unstable",
+    "internal",
 ] }
 zenoh-buffers = { git = "https://github.com/eclipse-zenoh/zenoh", branch = "dev/1.0.0" }
 zenoh-codec = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "dev/1.0.0" }
