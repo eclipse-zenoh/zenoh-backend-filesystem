@@ -20,17 +20,16 @@ use std::path::PathBuf;
 use tempfile::tempfile_in;
 use tracing::{debug, warn};
 use zenoh::internal::Value;
+use zenoh::internal::{bail, zenoh_home, zerror};
+use zenoh::key_expr::{keyexpr, OwnedKeyExpr};
+use zenoh::selector::Parameters;
 use zenoh::time::Timestamp;
-use zenoh::Result as ZResult;
+use zenoh::{try_init_log_from_env, Result as ZResult};
 use zenoh_backend_traits::{
     config::StorageConfig, config::VolumeConfig, Storage, StorageInsertionResult, Volume,
 };
 use zenoh_backend_traits::{Capability, History, Persistence, StoredData, VolumeInstance};
-use zenoh_core::{bail, zerror};
-use zenoh_keyexpr::{keyexpr, OwnedKeyExpr};
 use zenoh_plugin_trait::{plugin_long_version, plugin_version, Plugin};
-use zenoh_protocol::core::Parameters;
-use zenoh_util::zenoh_home;
 
 mod data_info_mgt;
 mod files_mgt;
@@ -69,7 +68,7 @@ impl Plugin for FileSystemBackend {
     const PLUGIN_LONG_VERSION: &'static str = plugin_long_version!();
 
     fn start(_name: &str, _config: &Self::StartArgs) -> ZResult<Self::Instance> {
-        zenoh_util::try_init_log_from_env();
+        try_init_log_from_env();
         debug!("FileSystem backend {}", Self::PLUGIN_VERSION);
 
         let root_path = if let Some(dir) = std::env::var_os(SCOPE_ENV_VAR) {
