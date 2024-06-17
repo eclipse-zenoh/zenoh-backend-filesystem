@@ -55,12 +55,12 @@ walkdir = "2.3.2"
 zenoh = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "dev/1.0.0", features = [
     "unstable",
     "internal",
+    "plugins"
 ] }
 
 zenoh_backend_traits = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "dev/1.0.0" }
 zenoh-plugin-trait = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "dev/1.0.0" }
 zenoh-codec = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "dev/1.0.0" }
-
 
 [build-dependencies]
 rustc_version = "0.4.0"
