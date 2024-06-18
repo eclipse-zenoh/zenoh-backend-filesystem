@@ -14,22 +14,22 @@
 
 use async_trait::async_trait;
 use std::collections::HashMap;
-use std::convert::TryInto;
+use std::fs::DirBuilder;
 use std::io::prelude::*;
 use std::path::PathBuf;
-use std::{fs::DirBuilder, sync::Arc};
 use tempfile::tempfile_in;
 use tracing::{debug, warn};
-use zenoh::prelude::*;
+use zenoh::internal::Value;
+use zenoh::internal::{bail, zenoh_home, zerror};
+use zenoh::key_expr::{keyexpr, OwnedKeyExpr};
+use zenoh::selector::Parameters;
 use zenoh::time::Timestamp;
-use zenoh::Result as ZResult;
+use zenoh::{try_init_log_from_env, Result as ZResult};
 use zenoh_backend_traits::{
     config::StorageConfig, config::VolumeConfig, Storage, StorageInsertionResult, Volume,
 };
 use zenoh_backend_traits::{Capability, History, Persistence, StoredData, VolumeInstance};
-use zenoh_core::{bail, zerror};
 use zenoh_plugin_trait::{plugin_long_version, plugin_version, Plugin};
-use zenoh_util::zenoh_home;
 
 mod data_info_mgt;
 mod files_mgt;
@@ -68,7 +68,7 @@ impl Plugin for FileSystemBackend {
     const PLUGIN_LONG_VERSION: &'static str = plugin_long_version!();
 
     fn start(_name: &str, _config: &Self::StartArgs) -> ZResult<Self::Instance> {
-        zenoh_util::try_init_log_from_env();
+        try_init_log_from_env();
         debug!("FileSystem backend {}", Self::PLUGIN_VERSION);
 
         let root_path = if let Some(dir) = std::env::var_os(SCOPE_ENV_VAR) {
@@ -97,11 +97,11 @@ impl Plugin for FileSystemBackend {
         };
         debug!("Using root dir: {}", root.display());
 
-        let mut properties = zenoh::properties::Properties::default();
-        properties.insert("root".into(), root.to_string_lossy().into());
-        properties.insert("version".into(), Self::PLUGIN_VERSION.into());
+        let mut parameters = Parameters::default();
+        parameters.insert::<String, String>("root".into(), root.to_string_lossy().into());
+        parameters.insert::<String, String>("version".into(), Self::PLUGIN_VERSION.into());
 
-        let admin_status = HashMap::from(properties)
+        let admin_status = HashMap::from(parameters)
             .into_iter()
             .map(|(k, v)| (k, serde_json::Value::String(v)))
             .collect();
@@ -251,14 +251,6 @@ impl Volume for FileSystemVolume {
             read_only,
         }))
     }
-
-    fn incoming_data_interceptor(&self) -> Option<Arc<dyn Fn(Sample) -> Sample + Sync + Send>> {
-        None
-    }
-
-    fn outgoing_data_interceptor(&self) -> Option<Arc<dyn Fn(Sample) -> Sample + Sync + Send>> {
-        None
-    }
 }
 
 struct FileSystemStorage {
@@ -285,14 +277,24 @@ impl Storage for FileSystemStorage {
                 let zfile = self.files_mgr.to_zfile(k);
                 // write file
                 self.files_mgr
-                    .write_file(&zfile, value.payload, &value.encoding, &timestamp)
+                    .write_file(
+                        &zfile,
+                        value.payload().into(),
+                        value.encoding().clone(),
+                        &timestamp,
+                    )
                     .await?;
                 Ok(StorageInsertionResult::Inserted)
             } else {
                 let zfile = self.files_mgr.to_zfile(ROOT_KEY);
                 // write file
                 self.files_mgr
-                    .write_file(&zfile, value.payload, &value.encoding, &timestamp)
+                    .write_file(
+                        &zfile,
+                        value.payload().into(),
+                        value.encoding().clone(),
+                        &timestamp,
+                    )
                     .await?;
                 Ok(StorageInsertionResult::Inserted)
             }

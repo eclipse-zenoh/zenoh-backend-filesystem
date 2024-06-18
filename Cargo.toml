@@ -47,21 +47,20 @@ lazy_static = "1.4.0"
 mime_guess = "2.0.4"
 regex = "1.7.1"
 rocksdb = "0.20.1"
-serde_json = "1.0.94"
+serde_json = "1.0.117"
 tempfile = "3.4.0"
 tracing = "0.1"
 uhlc = "0.5.2"
 walkdir = "2.3.2"
-zenoh = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main", features = ["unstable"] }
-zenoh-codec = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
-zenoh-collections = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
-zenoh-core = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
-zenoh-protocol = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
-zenoh-util = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
-zenoh_backend_traits = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
-zenoh-plugin-trait = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
+zenoh = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "dev/1.0.0", features = [
+    "unstable",
+    "internal",
+    "plugins"
+] }
 
-
+zenoh_backend_traits = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "dev/1.0.0" }
+zenoh-plugin-trait = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "dev/1.0.0" }
+zenoh-codec = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "dev/1.0.0" }
 
 [build-dependencies]
 rustc_version = "0.4.0"

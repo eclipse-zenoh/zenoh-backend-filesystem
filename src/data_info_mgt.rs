@@ -16,12 +16,12 @@ use rocksdb::DB;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tracing::trace;
-use zenoh::buffers::{reader::HasReader, writer::HasWriter};
-use zenoh::prelude::*;
+use zenoh::encoding::Encoding;
+use zenoh::internal::buffers::{HasReader, HasWriter};
+use zenoh::internal::{bail, zerror};
 use zenoh::time::{Timestamp, NTP64};
 use zenoh::Result as ZResult;
 use zenoh_codec::{RCodec, WCodec, Zenoh080};
-use zenoh_core::{bail, zerror};
 
 lazy_static::lazy_static! {
     static ref GC_PERIOD: Duration = Duration::new(30, 0);
@@ -64,22 +64,23 @@ impl DataInfoMgr {
     pub(crate) async fn put_data_info<P: AsRef<Path>>(
         &self,
         file: P,
-        encoding: &Encoding,
+        encoding: Encoding,
         timestamp: &Timestamp,
     ) -> ZResult<()> {
         const ERR: &str = "Failed to encode data-info for";
 
         let key = file.as_ref().to_string_lossy();
         trace!("Put data-info for {}", key);
-        let mut value = vec![];
+        let mut value: Vec<u8> = vec![];
         let mut writer = value.writer();
         let codec = Zenoh080::new();
         // note: encode timestamp at first for faster decoding when only this one is required
         codec
             .write(&mut writer, timestamp)
             .map_err(|_| zerror!("{} {:?}", ERR, file.as_ref()))?;
+
         codec
-            .write(&mut writer, encoding)
+            .write(&mut writer, encoding.to_string().as_bytes())
             .map_err(|_| zerror!("{} {:?}", ERR, file.as_ref()))?;
 
         self.db
@@ -153,8 +154,9 @@ fn decode_encoding_timestamp_from_value(val: &[u8]) -> ZResult<(Encoding, Timest
     let timestamp: Timestamp = codec
         .read(&mut reader)
         .map_err(|_| zerror!("Failed to decode data-info (timestamp)"))?;
-    let encoding: Encoding = codec
+
+    let encoding_string: String = codec
         .read(&mut reader)
         .map_err(|_| zerror!("Failed to decode data-info (encoding)"))?;
-    Ok((encoding, timestamp))
+    Ok((Encoding::from(encoding_string), timestamp))
 }
