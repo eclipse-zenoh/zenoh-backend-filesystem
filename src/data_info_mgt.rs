@@ -13,15 +13,15 @@
 //
 use async_std::sync::{Arc, Mutex};
 use rocksdb::DB;
+use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tracing::trace;
+use zenoh::bytes::ZBytes;
 use zenoh::encoding::Encoding;
-use zenoh::internal::buffers::{HasReader, HasWriter};
 use zenoh::internal::{bail, zerror};
 use zenoh::time::{Timestamp, NTP64};
 use zenoh::Result as ZResult;
-use zenoh_codec::{RCodec, WCodec, Zenoh080};
 
 lazy_static::lazy_static! {
     static ref GC_PERIOD: Duration = Duration::new(30, 0);
@@ -71,22 +71,21 @@ impl DataInfoMgr {
 
         let key = file.as_ref().to_string_lossy();
         trace!("Put data-info for {}", key);
-        let mut value: Vec<u8> = vec![];
-        let mut writer = value.writer();
-        let codec = Zenoh080::new();
-        // note: encode timestamp at first for faster decoding when only this one is required
-        codec
-            .write(&mut writer, timestamp)
+
+        let mut z_bytes = ZBytes::empty();
+        let mut writer = z_bytes.writer();
+        writer
+            .serialize(timestamp)
             .map_err(|_| zerror!("{} {:?}", ERR, file.as_ref()))?;
 
-        codec
-            .write(&mut writer, encoding.to_string().as_bytes())
-            .map_err(|_| zerror!("{} {:?}", ERR, file.as_ref()))?;
+        writer
+            .serialize(encoding)
+            .map_err(|_| zerror!("Failed to encode data-info (deleted)"))?;
 
         self.db
             .lock()
             .await
-            .put(key.as_bytes(), value)
+            .put(key.as_bytes(), Cow::from(z_bytes))
             .map_err(|e| zerror!("Failed to save data-info for {:?}: {}", file.as_ref(), e).into())
     }
 
@@ -149,14 +148,17 @@ impl DataInfoMgr {
 }
 
 fn decode_encoding_timestamp_from_value(val: &[u8]) -> ZResult<(Encoding, Timestamp)> {
-    let codec = Zenoh080::new();
-    let mut reader = val.reader();
-    let timestamp: Timestamp = codec
-        .read(&mut reader)
+    let bytes = ZBytes::from(val);
+
+    let mut reader = bytes.reader();
+
+    let timestamp: Timestamp = reader
+        .deserialize()
         .map_err(|_| zerror!("Failed to decode data-info (timestamp)"))?;
 
-    let encoding_string: String = codec
-        .read(&mut reader)
-        .map_err(|_| zerror!("Failed to decode data-info (encoding)"))?;
-    Ok((Encoding::from(encoding_string), timestamp))
+    let encoding: Encoding = reader
+        .deserialize()
+        .map_err(|_| zerror!("Failed to decode data-info (Encoding)"))?;
+
+    Ok((encoding, timestamp))
 }
