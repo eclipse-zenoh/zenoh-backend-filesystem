@@ -52,15 +52,15 @@ tempfile = "3.4.0"
 tracing = "0.1"
 uhlc = "0.5.2"
 walkdir = "2.3.2"
-zenoh = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "dev/1.0.0", features = [
+zenoh = { features = [
     "unstable",
     "internal",
     "plugins"
-] }
+] , version = "1.0.0-alpha.2" }
 
-zenoh_backend_traits = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "dev/1.0.0" }
-zenoh-plugin-trait = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "dev/1.0.0" }
-zenoh-codec = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "dev/1.0.0" }
+zenoh_backend_traits = { version = "1.0.0-alpha.2" }
+zenoh-plugin-trait = { version = "1.0.0-alpha.2" }
+zenoh-codec = { version = "1.0.0-alpha.2" }
 
 
 [build-dependencies]
@@ -72,4 +72,4 @@ maintainer = "zenoh-dev@eclipse.org"
 copyright = "2022 ZettaScale Technology"
 section = "net"
 license-file = ["LICENSE", "0"]
-depends = "zenoh-plugin-storage-manager (=0.11.0-dev-1)"
+depends = "zenoh-plugin-storage-manager (=1.0.0~alpha.2-1)"
