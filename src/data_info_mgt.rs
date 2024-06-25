@@ -67,20 +67,13 @@ impl DataInfoMgr {
         encoding: Encoding,
         timestamp: &Timestamp,
     ) -> ZResult<()> {
-        const ERR: &str = "Failed to encode data-info for";
-
         let key = file.as_ref().to_string_lossy();
         trace!("Put data-info for {}", key);
 
         let mut z_bytes = ZBytes::empty();
         let mut writer = z_bytes.writer();
-        writer
-            .serialize(timestamp)
-            .map_err(|_| zerror!("{} {:?}", ERR, file.as_ref()))?;
-
-        writer
-            .serialize(encoding)
-            .map_err(|_| zerror!("Failed to encode data-info (deleted)"))?;
+        writer.serialize(timestamp);
+        writer.serialize(encoding);
 
         self.db
             .lock()

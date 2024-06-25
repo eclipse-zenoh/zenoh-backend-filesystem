@@ -322,7 +322,7 @@ impl FilesMgr {
             let mime_type = mime_guess::from_path(file).first_or_octet_stream();
             Encoding::from(mime_type.essence_str().to_string())
         } else {
-            Encoding::APPLICATION_OCTET_STREAM.into()
+            Encoding::APPLICATION_OCTET_STREAM
         }
     }
 
