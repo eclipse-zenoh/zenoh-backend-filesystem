@@ -12,23 +12,23 @@
 //   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 //
 
+use std::{collections::HashMap, fs::DirBuilder, io::prelude::*, path::PathBuf};
+
 use async_trait::async_trait;
-use std::collections::HashMap;
-use std::fs::DirBuilder;
-use std::io::prelude::*;
-use std::path::PathBuf;
 use tempfile::tempfile_in;
 use tracing::{debug, warn};
-use zenoh::internal::Value;
-use zenoh::internal::{bail, zenoh_home, zerror};
-use zenoh::key_expr::{keyexpr, OwnedKeyExpr};
-use zenoh::selector::Parameters;
-use zenoh::time::Timestamp;
-use zenoh::{try_init_log_from_env, Result as ZResult};
-use zenoh_backend_traits::{
-    config::StorageConfig, config::VolumeConfig, Storage, StorageInsertionResult, Volume,
+use zenoh::{
+    internal::{bail, zenoh_home, zerror, Value},
+    key_expr::{keyexpr, OwnedKeyExpr},
+    query::Parameters,
+    time::Timestamp,
+    try_init_log_from_env, Result as ZResult,
 };
-use zenoh_backend_traits::{Capability, History, Persistence, StoredData, VolumeInstance};
+use zenoh_backend_traits::{
+    config::{StorageConfig, VolumeConfig},
+    Capability, History, Persistence, Storage, StorageInsertionResult, StoredData, Volume,
+    VolumeInstance,
+};
 use zenoh_plugin_trait::{plugin_long_version, plugin_version, Plugin};
 
 mod data_info_mgt;

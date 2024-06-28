@@ -11,24 +11,31 @@
 // Contributors:
 //   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 //
+use std::{
+    borrow::Cow,
+    convert::TryFrom,
+    fmt,
+    fs::{metadata, remove_dir, remove_dir_all, remove_file, rename, DirBuilder, File},
+    io::prelude::*,
+    iter::Iterator,
+    path::{Path, PathBuf},
+    time::{SystemTime, UNIX_EPOCH},
+};
+
 use async_std::task;
-use std::borrow::Cow;
-use std::convert::TryFrom;
-use std::fmt;
-use std::fs::{metadata, remove_dir, remove_dir_all, remove_file, rename, DirBuilder, File};
-use std::io::prelude::*;
-use std::iter::Iterator;
-use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::{debug, trace, warn};
 use walkdir::{IntoIter, WalkDir};
-use zenoh::encoding::Encoding;
-use zenoh::internal::buffers::{SplitBuffer, ZBuf};
-use zenoh::internal::Value;
-use zenoh::internal::{bail, zerror};
-use zenoh::key_expr::keyexpr;
-use zenoh::time::{Timestamp, TimestampId};
-use zenoh::Result as ZResult;
+use zenoh::{
+    bytes::Encoding,
+    internal::{
+        bail,
+        buffers::{SplitBuffer, ZBuf},
+        zerror, Value,
+    },
+    key_expr::keyexpr,
+    time::{Timestamp, TimestampId},
+    Result as ZResult,
+};
 
 use crate::data_info_mgt::*;
 
