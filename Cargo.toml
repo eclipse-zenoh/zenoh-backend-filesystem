@@ -52,15 +52,14 @@ tempfile = "3.4.0"
 tracing = "0.1"
 uhlc = "0.5.2"
 walkdir = "2.3.2"
-zenoh = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "dev/1.0.0", features = [
+zenoh = { git = "https://github.com/ZettaScaleLabs/zenoh.git", branch = "pubsub_query", features = [
     "unstable",
     "internal",
     "plugins"
 ] }
 
-zenoh_backend_traits = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "dev/1.0.0" }
-zenoh-plugin-trait = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "dev/1.0.0" }
-zenoh-codec = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "dev/1.0.0" }
+zenoh_backend_traits = { git = "https://github.com/ZettaScaleLabs/zenoh.git", branch = "pubsub_query" }
+zenoh-plugin-trait = { git = "https://github.com/ZettaScaleLabs/zenoh.git", branch = "pubsub_query" }
 
 
 [build-dependencies]

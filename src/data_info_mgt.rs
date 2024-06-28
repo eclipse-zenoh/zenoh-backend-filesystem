@@ -11,17 +11,21 @@
 // Contributors:
 //   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 //
+use std::{
+    borrow::Cow,
+    path::{Path, PathBuf},
+    time::Duration,
+};
+
 use async_std::sync::{Arc, Mutex};
 use rocksdb::DB;
-use std::borrow::Cow;
-use std::path::{Path, PathBuf};
-use std::time::Duration;
 use tracing::trace;
-use zenoh::bytes::ZBytes;
-use zenoh::encoding::Encoding;
-use zenoh::internal::{bail, zerror};
-use zenoh::time::{Timestamp, NTP64};
-use zenoh::Result as ZResult;
+use zenoh::{
+    bytes::{Encoding, ZBytes},
+    internal::{bail, zerror},
+    time::{Timestamp, NTP64},
+    Result as ZResult,
+};
 
 lazy_static::lazy_static! {
     static ref GC_PERIOD: Duration = Duration::new(30, 0);
