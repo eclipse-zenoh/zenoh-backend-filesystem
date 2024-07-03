@@ -60,7 +60,6 @@ zenoh = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "dev/1.0.
 
 zenoh_backend_traits = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "dev/1.0.0" }
 zenoh-plugin-trait = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "dev/1.0.0" }
-zenoh-codec = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "dev/1.0.0" }
 
 
 [build-dependencies]
