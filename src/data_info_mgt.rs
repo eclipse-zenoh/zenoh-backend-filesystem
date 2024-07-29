@@ -14,11 +14,12 @@
 use std::{
     borrow::Cow,
     path::{Path, PathBuf},
+    sync::Arc,
     time::Duration,
 };
 
-use async_std::sync::{Arc, Mutex};
 use rocksdb::DB;
+use tokio::sync::Mutex;
 use tracing::trace;
 use zenoh::{
     bytes::{Encoding, ZBytes},

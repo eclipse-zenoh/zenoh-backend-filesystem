@@ -38,7 +38,6 @@ dynamic_plugin = []
 default = ["dynamic_plugin"]
 
 [dependencies]
-async-std = "=1.12.0"
 async-trait = "0.1.66"
 dunce = "1.0.3"
 git-version = "0.3.5"
@@ -49,6 +48,7 @@ regex = "1.7.1"
 rocksdb = "0.22.0"
 serde_json = "1.0.117"
 tempfile = "3.4.0"
+tokio = { version = "1.35.1", default-features = false } # Default features are disabled due to some crates' requirements
 tracing = "0.1"
 uhlc = "0.5.2"
 walkdir = "2.3.2"
@@ -57,7 +57,6 @@ zenoh = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "dev/1.0.
     "internal",
     "plugins"
 ] }
-
 zenoh_backend_traits = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "dev/1.0.0" }
 zenoh-plugin-trait = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "dev/1.0.0" }
 

@@ -22,7 +22,6 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use async_std::task;
 use tracing::{debug, trace, warn};
 use walkdir::{IntoIter, WalkDir};
 use zenoh::{
@@ -37,7 +36,7 @@ use zenoh::{
     Result as ZResult,
 };
 
-use crate::data_info_mgt::*;
+use crate::{data_info_mgt::*, TOKIO_RUNTIME};
 
 pub const CONFLICT_SUFFIX: &str = ".##z";
 
@@ -378,14 +377,16 @@ impl Drop for FilesMgr {
         match self.on_closure {
             OnClosure::DeleteAll => {
                 // Close data_info_mgr at first
-                task::block_on(async move {
-                    self.data_info_mgr
-                        .close()
-                        .await
-                        .unwrap_or_else(|e| warn!("{}", e));
-                    remove_dir_all(&self.base_dir).unwrap_or_else(|err| {
-                        warn!("Failed to cleanup directory {:?}; {}", self.base_dir, err)
-                    });
+                tokio::task::block_in_place(|| {
+                    TOKIO_RUNTIME.block_on(async move {
+                        self.data_info_mgr
+                            .close()
+                            .await
+                            .unwrap_or_else(|e| warn!("{}", e));
+                        remove_dir_all(&self.base_dir).unwrap_or_else(|err| {
+                            warn!("Failed to cleanup directory {:?}; {}", self.base_dir, err)
+                        });
+                    })
                 });
             }
             OnClosure::DoNothing => {

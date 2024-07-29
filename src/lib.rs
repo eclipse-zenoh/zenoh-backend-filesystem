@@ -35,6 +35,17 @@ mod data_info_mgt;
 mod files_mgt;
 use files_mgt::*;
 
+const WORKER_THREAD_NUM: usize = 2;
+const MAX_BLOCK_THREAD_NUM: usize = 50;
+lazy_static::lazy_static! {
+    pub static ref TOKIO_RUNTIME: tokio::runtime::Runtime = tokio::runtime::Builder::new_multi_thread()
+               .worker_threads(WORKER_THREAD_NUM)
+               .max_blocking_threads(MAX_BLOCK_THREAD_NUM)
+               .enable_all()
+               .build()
+               .expect("Unable to create runtime");
+}
+
 /// The environement variable used to configure the root of all storages managed by this FileSystemBackend.
 pub const SCOPE_ENV_VAR: &str = "ZENOH_BACKEND_FS_ROOT";
 
