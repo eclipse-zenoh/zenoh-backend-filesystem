@@ -74,10 +74,13 @@ impl DataInfoMgr {
         let key = file.as_ref().to_string_lossy();
         trace!("Put data-info for {}", key);
 
-        let mut z_bytes = ZBytes::empty();
-        let mut writer = z_bytes.writer();
-        writer.serialize(timestamp);
-        writer.serialize(encoding);
+        let z_bytes = {
+            let mut zb = ZBytes::empty();
+            let mut writer = zb.writer();
+            writer.serialize(timestamp);
+            writer.serialize(encoding);
+            zb
+        };
 
         self.db
             .lock()
