@@ -3385,7 +3385,6 @@ dependencies = [
 name = "zenoh-backend-filesystem"
 version = "0.11.0-dev"
 dependencies = [
- "async-std",
  "async-trait",
  "dunce",
  "git-version",
@@ -3397,6 +3396,7 @@ dependencies = [
  "rustc_version",
  "serde_json",
  "tempfile",
+ "tokio",
  "tracing",
  "uhlc 0.5.2",
  "walkdir",

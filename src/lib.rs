@@ -12,7 +12,7 @@
 //   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 //
 
-use std::{collections::HashMap, fs::DirBuilder, io::prelude::*, path::PathBuf};
+use std::{collections::HashMap, fs::DirBuilder, future::Future, io::prelude::*, path::PathBuf};
 
 use async_trait::async_trait;
 use tempfile::tempfile_in;
@@ -34,6 +34,32 @@ use zenoh_plugin_trait::{plugin_long_version, plugin_version, Plugin};
 mod data_info_mgt;
 mod files_mgt;
 use files_mgt::*;
+
+const WORKER_THREAD_NUM: usize = 2;
+const MAX_BLOCK_THREAD_NUM: usize = 50;
+lazy_static::lazy_static! {
+    // The global runtime is used in the dynamic plugins, which we can't get the current runtime
+    static ref TOKIO_RUNTIME: tokio::runtime::Runtime = tokio::runtime::Builder::new_multi_thread()
+               .worker_threads(WORKER_THREAD_NUM)
+               .max_blocking_threads(MAX_BLOCK_THREAD_NUM)
+               .enable_all()
+               .build()
+               .expect("Unable to create runtime");
+}
+#[inline(always)]
+fn blockon_runtime<F: Future>(task: F) -> F::Output {
+    // Check whether able to get the current runtime
+    match tokio::runtime::Handle::try_current() {
+        Ok(rt) => {
+            // Able to get the current runtime (standalone binary), spawn on the current runtime
+            tokio::task::block_in_place(|| rt.block_on(task))
+        }
+        Err(_) => {
+            // Unable to get the current runtime (dynamic plugins), spawn on the global runtime
+            tokio::task::block_in_place(|| TOKIO_RUNTIME.block_on(task))
+        }
+    }
+}
 
 /// The environement variable used to configure the root of all storages managed by this FileSystemBackend.
 pub const SCOPE_ENV_VAR: &str = "ZENOH_BACKEND_FS_ROOT";

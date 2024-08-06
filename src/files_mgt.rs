@@ -22,7 +22,6 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use async_std::task;
 use tracing::{debug, trace, warn};
 use walkdir::{IntoIter, WalkDir};
 use zenoh::{
@@ -37,7 +36,7 @@ use zenoh::{
     Result as ZResult,
 };
 
-use crate::data_info_mgt::*;
+use crate::{blockon_runtime, data_info_mgt::*};
 
 pub const CONFLICT_SUFFIX: &str = ".##z";
 
@@ -378,7 +377,7 @@ impl Drop for FilesMgr {
         match self.on_closure {
             OnClosure::DeleteAll => {
                 // Close data_info_mgr at first
-                task::block_on(async move {
+                blockon_runtime(async move {
                     self.data_info_mgr
                         .close()
                         .await
