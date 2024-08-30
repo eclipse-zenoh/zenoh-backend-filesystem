@@ -11,24 +11,32 @@
 // Contributors:
 //   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 //
-use async_std::task;
-use std::borrow::Cow;
-use std::convert::TryFrom;
-use std::fmt;
-use std::fs::{metadata, remove_dir, remove_dir_all, remove_file, rename, DirBuilder, File};
-use std::io::prelude::*;
-use std::iter::Iterator;
-use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    borrow::Cow,
+    convert::TryFrom,
+    fmt,
+    fs::{metadata, remove_dir, remove_dir_all, remove_file, rename, DirBuilder, File},
+    io::prelude::*,
+    iter::Iterator,
+    path::{Path, PathBuf},
+    time::{SystemTime, UNIX_EPOCH},
+};
+
 use tracing::{debug, trace, warn};
 use walkdir::{IntoIter, WalkDir};
-use zenoh::buffers::ZBuf;
-use zenoh::prelude::*;
-use zenoh::time::{Timestamp, TimestampId};
-use zenoh::Result as ZResult;
-use zenoh_core::{bail, zerror};
+use zenoh::{
+    bytes::Encoding,
+    internal::{
+        bail,
+        buffers::{SplitBuffer, ZBuf},
+        zerror, Value,
+    },
+    key_expr::keyexpr,
+    time::{Timestamp, TimestampId},
+    Result as ZResult,
+};
 
-use crate::data_info_mgt::*;
+use crate::{blockon_runtime, data_info_mgt::*};
 
 pub const CONFLICT_SUFFIX: &str = ".##z";
 
@@ -107,7 +115,7 @@ impl FilesMgr {
         &self,
         zfile: &ZFile<'_>,
         content: ZBuf,
-        encoding: &Encoding,
+        encoding: Encoding,
         timestamp: &Timestamp,
     ) -> ZResult<()> {
         let file = &zfile.fspath;
@@ -136,7 +144,7 @@ impl FilesMgr {
                         // fallback: get encoding and timestamp from file's metadata
                         let (a_encoding, a_timestamp) = self.generate_metadata(a, timestamp);
                         self.data_info_mgr
-                            .put_data_info(file, &a_encoding, &a_timestamp)
+                            .put_data_info(file, a_encoding, &a_timestamp)
                             .await
                             .ok()
                     }
@@ -239,10 +247,7 @@ impl FilesMgr {
                         } else {
                             let (encoding, timestamp) =
                                 self.get_encoding_and_timestamp(file).await?;
-                            Ok(Some((
-                                Value::new(content.into()).encoding(encoding),
-                                timestamp,
-                            )))
+                            Ok(Some((Value::new(content, encoding), timestamp)))
                         }
                     } else {
                         bail!(r#"Error reading file {:?}: too big to fit in memory"#, file)
@@ -323,7 +328,7 @@ impl FilesMgr {
             let mime_type = mime_guess::from_path(file).first_or_octet_stream();
             Encoding::from(mime_type.essence_str().to_string())
         } else {
-            KnownEncoding::AppOctetStream.into()
+            Encoding::APPLICATION_OCTET_STREAM
         }
     }
 
@@ -372,7 +377,7 @@ impl Drop for FilesMgr {
         match self.on_closure {
             OnClosure::DeleteAll => {
                 // Close data_info_mgr at first
-                task::block_on(async move {
+                blockon_runtime(async move {
                     self.data_info_mgr
                         .close()
                         .await

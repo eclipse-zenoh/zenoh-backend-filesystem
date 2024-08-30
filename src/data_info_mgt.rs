@@ -11,17 +11,22 @@
 // Contributors:
 //   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 //
-use async_std::sync::{Arc, Mutex};
+use std::{
+    borrow::Cow,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
+};
+
 use rocksdb::DB;
-use std::path::{Path, PathBuf};
-use std::time::Duration;
+use tokio::sync::Mutex;
 use tracing::trace;
-use zenoh::buffers::{reader::HasReader, writer::HasWriter};
-use zenoh::prelude::*;
-use zenoh::time::{Timestamp, NTP64};
-use zenoh::Result as ZResult;
-use zenoh_codec::{RCodec, WCodec, Zenoh080};
-use zenoh_core::{bail, zerror};
+use zenoh::{
+    bytes::{Encoding, ZBytes},
+    internal::{bail, zerror},
+    time::{Timestamp, NTP64},
+    Result as ZResult,
+};
 
 lazy_static::lazy_static! {
     static ref GC_PERIOD: Duration = Duration::new(30, 0);
@@ -64,28 +69,24 @@ impl DataInfoMgr {
     pub(crate) async fn put_data_info<P: AsRef<Path>>(
         &self,
         file: P,
-        encoding: &Encoding,
+        encoding: Encoding,
         timestamp: &Timestamp,
     ) -> ZResult<()> {
-        const ERR: &str = "Failed to encode data-info for";
-
         let key = file.as_ref().to_string_lossy();
         trace!("Put data-info for {}", key);
-        let mut value = vec![];
-        let mut writer = value.writer();
-        let codec = Zenoh080::new();
-        // note: encode timestamp at first for faster decoding when only this one is required
-        codec
-            .write(&mut writer, timestamp)
-            .map_err(|_| zerror!("{} {:?}", ERR, file.as_ref()))?;
-        codec
-            .write(&mut writer, encoding)
-            .map_err(|_| zerror!("{} {:?}", ERR, file.as_ref()))?;
+
+        let z_bytes = {
+            let mut zb = ZBytes::empty();
+            let mut writer = zb.writer();
+            writer.serialize(timestamp);
+            writer.serialize(encoding);
+            zb
+        };
 
         self.db
             .lock()
             .await
-            .put(key.as_bytes(), value)
+            .put(key.as_bytes(), Cow::from(z_bytes))
             .map_err(|e| zerror!("Failed to save data-info for {:?}: {}", file.as_ref(), e).into())
     }
 
@@ -148,13 +149,17 @@ impl DataInfoMgr {
 }
 
 fn decode_encoding_timestamp_from_value(val: &[u8]) -> ZResult<(Encoding, Timestamp)> {
-    let codec = Zenoh080::new();
-    let mut reader = val.reader();
-    let timestamp: Timestamp = codec
-        .read(&mut reader)
+    let bytes = ZBytes::from(val);
+
+    let mut reader = bytes.reader();
+
+    let timestamp: Timestamp = reader
+        .deserialize()
         .map_err(|_| zerror!("Failed to decode data-info (timestamp)"))?;
-    let encoding: Encoding = codec
-        .read(&mut reader)
-        .map_err(|_| zerror!("Failed to decode data-info (encoding)"))?;
+
+    let encoding: Encoding = reader
+        .deserialize()
+        .map_err(|_| zerror!("Failed to decode data-info (Encoding)"))?;
+
     Ok((encoding, timestamp))
 }

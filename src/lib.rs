@@ -12,28 +12,54 @@
 //   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 //
 
+use std::{collections::HashMap, fs::DirBuilder, future::Future, io::prelude::*, path::PathBuf};
+
 use async_trait::async_trait;
-use std::collections::HashMap;
-use std::convert::TryInto;
-use std::io::prelude::*;
-use std::path::PathBuf;
-use std::{fs::DirBuilder, sync::Arc};
 use tempfile::tempfile_in;
 use tracing::{debug, warn};
-use zenoh::prelude::*;
-use zenoh::time::Timestamp;
-use zenoh::Result as ZResult;
-use zenoh_backend_traits::{
-    config::StorageConfig, config::VolumeConfig, Storage, StorageInsertionResult, Volume,
+use zenoh::{
+    internal::{bail, zenoh_home, zerror, Value},
+    key_expr::{keyexpr, OwnedKeyExpr},
+    query::Parameters,
+    time::Timestamp,
+    try_init_log_from_env, Result as ZResult,
 };
-use zenoh_backend_traits::{Capability, History, Persistence, StoredData, VolumeInstance};
-use zenoh_core::{bail, zerror};
+use zenoh_backend_traits::{
+    config::{StorageConfig, VolumeConfig},
+    Capability, History, Persistence, Storage, StorageInsertionResult, StoredData, Volume,
+    VolumeInstance,
+};
 use zenoh_plugin_trait::{plugin_long_version, plugin_version, Plugin};
-use zenoh_util::zenoh_home;
 
 mod data_info_mgt;
 mod files_mgt;
 use files_mgt::*;
+
+const WORKER_THREAD_NUM: usize = 2;
+const MAX_BLOCK_THREAD_NUM: usize = 50;
+lazy_static::lazy_static! {
+    // The global runtime is used in the dynamic plugins, which we can't get the current runtime
+    static ref TOKIO_RUNTIME: tokio::runtime::Runtime = tokio::runtime::Builder::new_multi_thread()
+               .worker_threads(WORKER_THREAD_NUM)
+               .max_blocking_threads(MAX_BLOCK_THREAD_NUM)
+               .enable_all()
+               .build()
+               .expect("Unable to create runtime");
+}
+#[inline(always)]
+fn blockon_runtime<F: Future>(task: F) -> F::Output {
+    // Check whether able to get the current runtime
+    match tokio::runtime::Handle::try_current() {
+        Ok(rt) => {
+            // Able to get the current runtime (standalone binary), spawn on the current runtime
+            tokio::task::block_in_place(|| rt.block_on(task))
+        }
+        Err(_) => {
+            // Unable to get the current runtime (dynamic plugins), spawn on the global runtime
+            tokio::task::block_in_place(|| TOKIO_RUNTIME.block_on(task))
+        }
+    }
+}
 
 /// The environement variable used to configure the root of all storages managed by this FileSystemBackend.
 pub const SCOPE_ENV_VAR: &str = "ZENOH_BACKEND_FS_ROOT";
@@ -68,7 +94,7 @@ impl Plugin for FileSystemBackend {
     const PLUGIN_LONG_VERSION: &'static str = plugin_long_version!();
 
     fn start(_name: &str, _config: &Self::StartArgs) -> ZResult<Self::Instance> {
-        zenoh_util::try_init_log_from_env();
+        try_init_log_from_env();
         debug!("FileSystem backend {}", Self::PLUGIN_VERSION);
 
         let root_path = if let Some(dir) = std::env::var_os(SCOPE_ENV_VAR) {
@@ -97,11 +123,11 @@ impl Plugin for FileSystemBackend {
         };
         debug!("Using root dir: {}", root.display());
 
-        let mut properties = zenoh::properties::Properties::default();
-        properties.insert("root".into(), root.to_string_lossy().into());
-        properties.insert("version".into(), Self::PLUGIN_VERSION.into());
+        let mut parameters = Parameters::default();
+        parameters.insert::<String, String>("root".into(), root.to_string_lossy().into());
+        parameters.insert::<String, String>("version".into(), Self::PLUGIN_VERSION.into());
 
-        let admin_status = HashMap::from(properties)
+        let admin_status = HashMap::from(parameters)
             .into_iter()
             .map(|(k, v)| (k, serde_json::Value::String(v)))
             .collect();
@@ -251,14 +277,6 @@ impl Volume for FileSystemVolume {
             read_only,
         }))
     }
-
-    fn incoming_data_interceptor(&self) -> Option<Arc<dyn Fn(Sample) -> Sample + Sync + Send>> {
-        None
-    }
-
-    fn outgoing_data_interceptor(&self) -> Option<Arc<dyn Fn(Sample) -> Sample + Sync + Send>> {
-        None
-    }
 }
 
 struct FileSystemStorage {
@@ -285,14 +303,24 @@ impl Storage for FileSystemStorage {
                 let zfile = self.files_mgr.to_zfile(k);
                 // write file
                 self.files_mgr
-                    .write_file(&zfile, value.payload, &value.encoding, &timestamp)
+                    .write_file(
+                        &zfile,
+                        value.payload().into(),
+                        value.encoding().clone(),
+                        &timestamp,
+                    )
                     .await?;
                 Ok(StorageInsertionResult::Inserted)
             } else {
                 let zfile = self.files_mgr.to_zfile(ROOT_KEY);
                 // write file
                 self.files_mgr
-                    .write_file(&zfile, value.payload, &value.encoding, &timestamp)
+                    .write_file(
+                        &zfile,
+                        value.payload().into(),
+                        value.encoding().clone(),
+                        &timestamp,
+                    )
                     .await?;
                 Ok(StorageInsertionResult::Inserted)
             }

@@ -13,7 +13,7 @@
 #
 [package]
 name = "zenoh-backend-filesystem"
-version = "0.11.0-dev"
+version = "1.0.0-dev"
 repository = "https://github.com/eclipse-zenoh/zenoh-backend-filesystem"
 homepage = "http://zenoh.io"
 authors = [
@@ -38,7 +38,6 @@ dynamic_plugin = []
 default = ["dynamic_plugin"]
 
 [dependencies]
-async-std = "=1.12.0"
 async-trait = "0.1.66"
 dunce = "1.0.3"
 git-version = "0.3.5"
@@ -46,21 +45,20 @@ home = "0.5.4"
 lazy_static = "1.4.0"
 mime_guess = "2.0.4"
 regex = "1.7.1"
-rocksdb = "0.20.1"
-serde_json = "1.0.94"
+rocksdb = "0.22.0"
+serde_json = "1.0.117"
 tempfile = "3.4.0"
+tokio = { version = "1.35.1", default-features = false } # Default features are disabled due to some crates' requirements
 tracing = "0.1"
 uhlc = "0.5.2"
 walkdir = "2.3.2"
-zenoh = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main", features = ["unstable"] }
-zenoh-codec = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
-zenoh-collections = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
-zenoh-core = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
-zenoh-protocol = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
-zenoh-util = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
-zenoh_backend_traits = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
-zenoh-plugin-trait = { version = "0.11.0-dev", git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" }
-
+zenoh = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main", features = [
+    "unstable",
+    "internal",
+    "plugins"
+] , version = "1.0.0-dev" }
+zenoh_backend_traits = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" , version = "1.0.0-dev" }
+zenoh-plugin-trait = { git = "https://github.com/eclipse-zenoh/zenoh.git", branch = "main" , version = "1.0.0-dev" }
 
 
 [build-dependencies]
@@ -72,4 +70,4 @@ maintainer = "zenoh-dev@eclipse.org"
 copyright = "2022 ZettaScale Technology"
 section = "net"
 license-file = ["LICENSE", "0"]
-depends = "zenoh-plugin-storage-manager (=0.11.0-dev-1)"
+depends = "zenoh-plugin-storage-manager (=1.0.0~dev-1)"
