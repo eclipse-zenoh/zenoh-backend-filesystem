@@ -1,0 +1,26 @@
+{
+  plugins: {
+    // configuration of "storage-manager" plugin:
+    storage_manager: {
+      volumes: {
+        // configuration of a "fs" volume (the "zenoh_backend_fs" backend library will be loaded at startup)
+        fs: {},
+      },
+      storages: {
+        // configuration of a "demo" storage using the "fs" volume
+        demo: {
+          // the key expression this storage will subscribes to
+          key_expr: "demo/example/**",
+          // this prefix will be stripped from the received key when converting to file path
+          // this argument is optional.
+          strip_prefix: "demo/example",
+          volume: {
+            id: "fs",
+            // the key/values will be stored as files within this directory (relative to ${ZENOH_BACKEND_FS_ROOT})
+            dir: "example"
+          }
+        }
+      }
+    },
+  }
+}
