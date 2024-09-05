@@ -13,7 +13,7 @@
 #
 [package]
 name = "zenoh-backend-filesystem"
-version = "1.0.0-dev"
+version = "0.11.0-dev-156-g10cd8ef"
 repository = "https://github.com/eclipse-zenoh/zenoh-backend-filesystem"
 homepage = "http://zenoh.io"
 authors = [
