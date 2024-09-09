@@ -2901,7 +2901,7 @@ dependencies = [
 
 [[package]]
 name = "zenoh-backend-filesystem"
-version = "1.0.0-dev"
+version = "0.11.0-dev-161-gf13a36a"
 dependencies = [
  "async-trait",
  "dunce",
