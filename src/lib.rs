@@ -165,7 +165,6 @@ impl Volume for FileSystemVolume {
         Capability {
             persistence: Persistence::Durable,
             history: History::Latest,
-            read_cost: 0, // for now all reads locally are treared as 0, can optimize later
         }
     }
 
