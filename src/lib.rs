@@ -296,30 +296,23 @@ impl Storage for FileSystemStorage {
         value: Value,
         timestamp: Timestamp,
     ) -> ZResult<StorageInsertionResult> {
+        let Value {
+            payload, encoding, ..
+        } = value;
         if !self.read_only {
             if let Some(k) = key {
                 let k = k.as_str();
                 let zfile = self.files_mgr.to_zfile(k);
                 // write file
                 self.files_mgr
-                    .write_file(
-                        &zfile,
-                        value.payload().into(),
-                        value.encoding().clone(),
-                        &timestamp,
-                    )
+                    .write_file(&zfile, payload.into(), encoding, &timestamp)
                     .await?;
                 Ok(StorageInsertionResult::Inserted)
             } else {
                 let zfile = self.files_mgr.to_zfile(ROOT_KEY);
                 // write file
                 self.files_mgr
-                    .write_file(
-                        &zfile,
-                        value.payload().into(),
-                        value.encoding().clone(),
-                        &timestamp,
-                    )
+                    .write_file(&zfile, payload.into(), encoding, &timestamp)
                     .await?;
                 Ok(StorageInsertionResult::Inserted)
             }
