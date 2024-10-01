@@ -12,7 +12,6 @@
 //   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 //
 use std::{
-    borrow::Cow,
     path::{Path, PathBuf},
     sync::Arc,
     time::Duration,
@@ -27,6 +26,7 @@ use zenoh::{
     time::{Timestamp, NTP64},
     Result as ZResult,
 };
+use zenoh_ext::{z_deserialize, z_serialize};
 
 lazy_static::lazy_static! {
     static ref GC_PERIOD: Duration = Duration::new(30, 0);
@@ -75,18 +75,12 @@ impl DataInfoMgr {
         let key = file.as_ref().to_string_lossy();
         trace!("Put data-info for {}", key);
 
-        let z_bytes = {
-            let mut zb = ZBytes::empty();
-            let mut writer = zb.writer();
-            writer.serialize(timestamp);
-            writer.serialize(encoding);
-            zb
-        };
+        let z_bytes = z_serialize(&(timestamp, encoding));
 
         self.db
             .lock()
             .await
-            .put(key.as_bytes(), Cow::from(z_bytes))
+            .put(key.as_bytes(), z_bytes.to_bytes())
             .map_err(|e| zerror!("Failed to save data-info for {:?}: {}", file.as_ref(), e).into())
     }
 
@@ -150,16 +144,7 @@ impl DataInfoMgr {
 
 fn decode_encoding_timestamp_from_value(val: &[u8]) -> ZResult<(Encoding, Timestamp)> {
     let bytes = ZBytes::from(val);
-
-    let mut reader = bytes.reader();
-
-    let timestamp: Timestamp = reader
-        .deserialize()
-        .map_err(|_| zerror!("Failed to decode data-info (timestamp)"))?;
-
-    let encoding: Encoding = reader
-        .deserialize()
-        .map_err(|_| zerror!("Failed to decode data-info (Encoding)"))?;
-
+    let (timestamp, encoding) = z_deserialize(&bytes)
+        .map_err(|_| zerror!("Failed to decode data-info (timestamp, encoding)"))?;
     Ok((encoding, timestamp))
 }
