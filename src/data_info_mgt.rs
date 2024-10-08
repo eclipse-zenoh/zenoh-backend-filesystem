@@ -22,8 +22,8 @@ use tokio::sync::Mutex;
 use tracing::trace;
 use zenoh::{
     bytes::{Encoding, ZBytes},
-    internal::{bail, zerror},
-    time::{Timestamp, NTP64},
+    internal::{bail, buffers::ZSlice, zerror},
+    time::{Timestamp, TimestampId, NTP64},
     Result as ZResult,
 };
 use zenoh_ext::{z_deserialize, z_serialize};
@@ -31,6 +31,43 @@ use zenoh_ext::{z_deserialize, z_serialize};
 lazy_static::lazy_static! {
     static ref GC_PERIOD: Duration = Duration::new(30, 0);
     static ref MIN_DELAY_BEFORE_REMOVAL: NTP64 = NTP64::from(Duration::new(5, 0));
+}
+
+struct DataInfo {
+    pub timestamp: Timestamp,
+    pub encoding: Encoding,
+}
+
+type DataInfoTuple = (u64, [u8; 16], u16, Vec<u8>);
+
+impl DataInfo {
+    pub fn as_tuple(&self) -> DataInfoTuple {
+        let timestamp_time = self.timestamp.get_time().as_u64();
+        let timestamp_id = self.timestamp.get_id().to_le_bytes();
+        let encoding_id = self.encoding.id();
+        let encoding_schema = self
+            .encoding
+            .schema()
+            .map(|s| s.to_vec())
+            .unwrap_or_default();
+        (timestamp_time, timestamp_id, encoding_id, encoding_schema)
+    }
+    pub fn from_tuple(
+        (timestamp_time, timestamp_id, encoding_id, encoding_schema): DataInfoTuple,
+    ) -> ZResult<Self> {
+        let timestamp_id = TimestampId::try_from(timestamp_id)?;
+        let timestamp = Timestamp::new(NTP64(timestamp_time), timestamp_id);
+        let encoding_schema = if encoding_schema.is_empty() {
+            None
+        } else {
+            Some(ZSlice::from(encoding_schema))
+        };
+        let encoding = Encoding::new(encoding_id, encoding_schema);
+        Ok(DataInfo {
+            timestamp,
+            encoding,
+        })
+    }
 }
 
 pub(crate) struct DataInfoMgr {
@@ -75,7 +112,11 @@ impl DataInfoMgr {
         let key = file.as_ref().to_string_lossy();
         trace!("Put data-info for {}", key);
 
-        let z_bytes = z_serialize(&(timestamp, encoding));
+        let data_info = DataInfo {
+            timestamp: *timestamp,
+            encoding,
+        };
+        let z_bytes = z_serialize(&data_info.as_tuple());
 
         self.db
             .lock()
@@ -144,7 +185,8 @@ impl DataInfoMgr {
 
 fn decode_encoding_timestamp_from_value(val: &[u8]) -> ZResult<(Encoding, Timestamp)> {
     let bytes = ZBytes::from(val);
-    let (timestamp, encoding) = z_deserialize(&bytes)
-        .map_err(|_| zerror!("Failed to decode data-info (timestamp, encoding)"))?;
-    Ok((encoding, timestamp))
+    let tuple: DataInfoTuple =
+        z_deserialize(&bytes).map_err(|_| zerror!("Failed to decode data-info"))?;
+    let data_info = DataInfo::from_tuple(tuple)?;
+    Ok((data_info.encoding, data_info.timestamp))
 }
