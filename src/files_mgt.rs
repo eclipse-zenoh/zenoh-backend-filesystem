@@ -25,11 +25,11 @@ use std::{
 use tracing::{debug, trace, warn};
 use walkdir::{IntoIter, WalkDir};
 use zenoh::{
-    bytes::Encoding,
+    bytes::{Encoding, ZBytes},
     internal::{
         bail,
         buffers::{SplitBuffer, ZBuf},
-        zerror, Value,
+        zerror,
     },
     key_expr::keyexpr,
     time::{Timestamp, TimestampId},
@@ -216,7 +216,10 @@ impl FilesMgr {
     // Read a file and return it's content (as Vec<u8>), encoding and timestamp.
     // Encoding and timestamp are retrieved from the data_info_mgr if file was put via zenoh.
     // Otherwise, the encoding is guessed from the file extension, and the timestamp is computed from the file's time.
-    pub(crate) async fn read_file(&self, zfile: &ZFile<'_>) -> ZResult<Option<(Value, Timestamp)>> {
+    pub(crate) async fn read_file(
+        &self,
+        zfile: &ZFile<'_>,
+    ) -> ZResult<Option<(ZBytes, Encoding, Timestamp)>> {
         let file = &zfile.fspath;
         match self.perform_read(file).await? {
             Some(x) => Ok(Some(x)),
@@ -227,12 +230,12 @@ impl FilesMgr {
     async fn perform_read_from_conflict(
         &self,
         file: PathBuf,
-    ) -> ZResult<Option<(Value, Timestamp)>> {
+    ) -> ZResult<Option<(ZBytes, Encoding, Timestamp)>> {
         let file = self.get_conflict_file(file.to_path_buf());
         self.perform_read(&file.to_path_buf()).await
     }
 
-    async fn perform_read(&self, file: &Path) -> ZResult<Option<(Value, Timestamp)>> {
+    async fn perform_read(&self, file: &Path) -> ZResult<Option<(ZBytes, Encoding, Timestamp)>> {
         // consider file only is it exists, it's a file and in case of "follow_links=true" it doesn't contain symlink
         if file.exists() && file.is_file() && (self.follow_links || !self.contains_symlink(file)) {
             match File::open(file) {
@@ -247,7 +250,7 @@ impl FilesMgr {
                         } else {
                             let (encoding, timestamp) =
                                 self.get_encoding_and_timestamp(file).await?;
-                            Ok(Some((Value::new(content, encoding), timestamp)))
+                            Ok(Some((content.into(), encoding, timestamp)))
                         }
                     } else {
                         bail!(r#"Error reading file {:?}: too big to fit in memory"#, file)
