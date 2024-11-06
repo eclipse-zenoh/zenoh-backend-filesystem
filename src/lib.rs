@@ -18,7 +18,8 @@ use async_trait::async_trait;
 use tempfile::tempfile_in;
 use tracing::{debug, warn};
 use zenoh::{
-    internal::{bail, zenoh_home, zerror, Value},
+    bytes::{Encoding, ZBytes},
+    internal::{bail, zenoh_home, zerror},
     key_expr::{keyexpr, OwnedKeyExpr},
     query::Parameters,
     time::Timestamp,
@@ -293,12 +294,10 @@ impl Storage for FileSystemStorage {
     async fn put(
         &mut self,
         key: Option<OwnedKeyExpr>,
-        value: Value,
+        payload: ZBytes,
+        encoding: Encoding,
         timestamp: Timestamp,
     ) -> ZResult<StorageInsertionResult> {
-        let Value {
-            payload, encoding, ..
-        } = value;
         if !self.read_only {
             if let Some(k) = key {
                 let k = k.as_str();
@@ -364,7 +363,11 @@ impl Storage for FileSystemStorage {
             let k = k.as_str();
             let zfile = self.files_mgr.to_zfile(k);
             match self.files_mgr.read_file(&zfile).await {
-                Ok(Some((value, timestamp))) => Ok(vec![StoredData { value, timestamp }]),
+                Ok(Some((payload, encoding, timestamp))) => Ok(vec![StoredData {
+                    payload,
+                    encoding,
+                    timestamp,
+                }]),
                 Ok(None) => Ok(vec![]),
                 Err(e) => {
                     Err(format!("Get key {:?} : failed to read file {} : {}", key, zfile, e).into())
@@ -373,7 +376,11 @@ impl Storage for FileSystemStorage {
         } else {
             let zfile = self.files_mgr.to_zfile(ROOT_KEY);
             match self.files_mgr.read_file(&zfile).await {
-                Ok(Some((value, timestamp))) => Ok(vec![StoredData { value, timestamp }]),
+                Ok(Some((payload, encoding, timestamp))) => Ok(vec![StoredData {
+                    payload,
+                    encoding,
+                    timestamp,
+                }]),
                 Ok(None) => Ok(vec![]),
                 Err(e) => {
                     Err(format!("Get key {:?} : failed to read file {} : {}", key, zfile, e).into())
@@ -387,7 +394,7 @@ impl Storage for FileSystemStorage {
         // Add the root entry if it exists.
         // Root key can't be acuired from `matching_files` call
         // because it's name is specially chosen to be not allowed as key value ("@root")
-        if let Some((_, timestamp)) = self
+        if let Some((_, _, timestamp)) = self
             .files_mgr
             .read_file(&self.files_mgr.to_zfile(ROOT_KEY))
             .await?
@@ -405,7 +412,7 @@ impl Storage for FileSystemStorage {
             let trimmed_zpath = get_trimmed_keyexpr(zfile.zpath.as_ref());
             let trimmed_zfile = self.files_mgr.to_zfile(trimmed_zpath);
             match self.files_mgr.read_file(&trimmed_zfile).await {
-                Ok(Some((_, timestamp))) => {
+                Ok(Some((_, _, timestamp))) => {
                     let zpath = Some(zfile.zpath.as_ref().try_into().unwrap());
                     result.push((zpath, timestamp));
                 }
