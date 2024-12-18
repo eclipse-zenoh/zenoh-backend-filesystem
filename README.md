@@ -15,6 +15,7 @@ Zenoh (pronounce _/zeno/_) unifies data in motion, data at rest and computations
 Check the website [zenoh.io](http://zenoh.io) and the [roadmap](https://github.com/eclipse-zenoh/roadmap) for more detailed information.
 
 -------------------------------
+
 # File system backend
 
 In zenoh a backend is a storage technology (such as DBMS, time-series database, file system...) alowing to store the
@@ -24,68 +25,73 @@ See the [zenoh documentation](https://zenoh.io/docs/manual/abstractions/#storage
 This backend relies on the host's file system to implement the storages.
 Its library name (without OS specific prefix and extension) that zenoh will rely on to find it and load it is **`zenoh_backend_fs`**.
 
+:point_right: **Install latest release:** see [below](#how-to-install-it)
 
-:point_right: **Install latest release:** see [below](#How-to-install-it)
-
-:point_right: **Build "main" branch:** see [below](#How-to-build-it)
+:point_right: **Build "main" branch:** see [below](#how-to-build-it)
 
 -------------------------------
+
 ## **Examples of usage**
 
 Prerequisites:
- - You have a zenoh router (`zenohd`) installed, and the `zenoh_backend_fs` library file is available in `~/.zenoh/lib`.
- - Declare the `ZENOH_BACKEND_FS_ROOT` environment variable to the directory where you want the files to be stored (or exposed from).
-   If you don't declare it, the `~/.zenoh/zenoh_backend_fs` directory will be used.
+
+- You have a zenoh router (`zenohd`) installed, and the `zenoh_backend_fs` library file is available in `~/.zenoh/lib`.
+- Declare the `ZENOH_BACKEND_FS_ROOT` environment variable to the directory where you want the files to be stored (or exposed from).
+  If you don't declare it, the `~/.zenoh/zenoh_backend_fs` directory will be used.
 
 You can setup storages either at zenoh router startup via a configuration file, either at runtime via the zenoh admin space, using for instance the REST API.
+
 ### **Setup via a JSON5 configuration file**
 
-  - Create a `zenoh.json5` configuration file containing:
-    ```json5
-    {
-      plugins: {
-        // configuration of "storage-manager" plugin:
-        storage_manager: {
-          volumes: {
-            // configuration of a "fs" volume (the "zenoh_backend_fs" backend library will be loaded at startup)
-            fs: {},
-          },
-          storages: {
-            // configuration of a "demo" storage using the "fs" volume
-            demo: {
-              // the key expression this storage will subscribes to
-              key_expr: "demo/example/**",
-              // this prefix will be stripped from the received key when converting to file path
-              // this argument is optional.
-              strip_prefix: "demo/example",
-              volume: {
-                id: "fs",
-                // the key/values will be stored as files within this directory (relative to ${ZENOH_BACKEND_FS_ROOT})
-                dir: "example"
-              }
+- Create a `zenoh.json5` configuration file containing:
+
+  ```json5
+  {
+    plugins: {
+      // configuration of "storage-manager" plugin:
+      storage_manager: {
+        volumes: {
+          // configuration of a "fs" volume (the "zenoh_backend_fs" backend library will be loaded at startup)
+          fs: {},
+        },
+        storages: {
+          // configuration of a "demo" storage using the "fs" volume
+          demo: {
+            // the key expression this storage will subscribes to
+            key_expr: "demo/example/**",
+            // this prefix will be stripped from the received key when converting to file path
+            // this argument is optional.
+            strip_prefix: "demo/example",
+            volume: {
+              id: "fs",
+              // the key/values will be stored as files within this directory (relative to ${ZENOH_BACKEND_FS_ROOT})
+              dir: "example"
             }
           }
-        },
-        // Optionally, add the REST plugin
-        rest: { http_port: 8000 }
-      }
+        }
+      },
+      // Optionally, add the REST plugin
+      rest: { http_port: 8000 }
     }
-    ```
-  - Run the zenoh router with:  
-    `zenohd -c zenoh.json5`
+  }
+  ```
+
+- Run the zenoh router with:  
+  `zenohd -c zenoh.json5`
 
 ### **Setup at runtime via `curl` commands on the admin space**
 
-  - Run the zenoh router, with write permissions to its admin space and with the REST plugin:  
-    `zenohd --adminspace-permissions=rw --rest-http-port=8000`
-  - Add the "fs" backend (the "zenoh_backend_fs" library will be loaded):  
-    `curl -X PUT -H 'content-type:application/json' -d '{}' http://localhost:8000/@/router/local/config/plugins/storage_manager/volumes/fs`
-  - Add the "demo" storage using the "fs" backend:  
-    `curl -X PUT -H 'content-type:application/json' -d '{key_expr:"demo/example/**",strip_prefix:"demo/example", volume: {id: "fs", dir:"example"}}' http://localhost:8000/@/router/local/config/plugins/storage_manager/storages/demo`
+- Run the zenoh router, with write permissions to its admin space and with the REST plugin:  
+  `zenohd --adminspace-permissions=rw --rest-http-port=8000`
+- Add the "fs" backend (the "zenoh_backend_fs" library will be loaded):  
+  `curl -X PUT -H 'content-type:application/json' -d '{}' http://localhost:8000/@/router/local/config/plugins/storage_manager/volumes/fs`
+- Add the "demo" storage using the "fs" backend:  
+  `curl -X PUT -H 'content-type:application/json' -d '{key_expr:"demo/example/**",strip_prefix:"demo/example", volume: {id: "fs", dir:"example"}}' http://localhost:8000/@/router/local/config/plugins/storage_manager/storages/demo`
 
 ### **Tests using the REST API**
 
 Using `curl` to publish and query keys/values, you can:
+
 ```bash
 # Put values that will be stored under ${ZENOH_BACKEND_FS_ROOT}/example
 curl -X PUT -d "TEST-1" http://localhost:8000/demo/example/test-1
@@ -111,15 +117,19 @@ Alternatively, you can test the zenoh router in a Docker container:
 -->
 
 -------------------------------
+
 ## Configuration
+
 ### Extra configuration for filesystem-backed volumes
 
 Volumes using the `fs` backend don't need any extra configuration at the volume level. Any volume can use the `fs` backend by specifying the value `"fs"` for the `backend` configuration key. A volume named `fs` will automatically be backed by the `fs` backend if no other backend is specified.
 
 -------------------------------
+
 ### Storage-level configuration for filesystem-backed volumes
 
 Storages relying on a `fs` backed volume must/can specify additional configuration specific to that volume, as shown in the example [above](#setup-via-a-json5-configuration-file):
+
 - `dir` (**required**, string) : The directory that will be used to store data.
 
 - `read_only` (optional, boolean) : the storage will only answer to GET queries. It will not accept any PUT or DELETE message, and won't write any file. `false` by default.
@@ -131,27 +141,30 @@ Storages relying on a `fs` backed volume must/can specify additional configurati
 - `follow_links` (optional, boolean) : If set to `true` the storage will follow the symbolic links. The default value is `false`.
 
 - `keep_mime_types` (optional, boolean) : When replying to a GET query with a file for which the zenoh encoding is not known, the storage guess its mime-type according to the file extension. If the mime-type doesn't correspond to a supported zenoh encoding, this option will drive the returned value:
-   - `true` (default value): a [Custom value](https://docs.rs/zenoh/latest/zenoh/enum.Value.html#variant.Custom)
-     is returned with the description set to the mime-type.
-   - `false`: a [Raw value](https://docs.rs/zenoh/latest/zenoh/enum.Value.html#variant.Raw) with
-     APP_OCTET_STREAM encoding is returned.
+  - `true` (default value): a [Custom value](https://docs.rs/zenoh/latest/zenoh/enum.Value.html#variant.Custom)
+    is returned with the description set to the mime-type.
+  - `false`: a [Raw value](https://docs.rs/zenoh/latest/zenoh/enum.Value.html#variant.Raw) with
+    APP_OCTET_STREAM encoding is returned.
 
 -------------------------------
+
 ## **Behaviour of the backend**
 
 ### Mapping to file system
+
 Each **storage** will map to a directory with path: `${ZENOH_BACKEND_FS_ROOT}/<dir>`, where:
-  * `${ZENOH_BACKEND_FS_ROOT}` is an environment variable that could be specified before zenoh router startup.
-     If this variable is not specified `${ZENOH_HOME}/zenoh_backend_fs` will be used
-     (where the default value of `${ZENOH_HOME}` is `~/.zenoh`).
-  * `<dir>` is the `"dir"` property specified at storage creation.
-Each zenoh **key/value** put into the storage will map to a file within the storage's directory where:
-  * the file path will be `${ZENOH_BACKEND_FS_ROOT}/<dir>/<relative_zenoh_key>`, where `<relative_zenoh_key>`
-    will be the zenoh key, stripped from the `"strip_prefix"` property specified at storage creation.
-  * the content of the file will be the value written as a RawValue. I.e. the same bytes buffer that has been
-    transported by zenoh. For UTF-8 compatible formats (StringUTF8, JSon, Integer, Float...) it means the file
-    will be readable as a text format.
-  * the encoding and the timestamp of the key/value will be stored in a RocksDB database stored in the storage directory.
+
+- `${ZENOH_BACKEND_FS_ROOT}` is an environment variable that could be specified before zenoh router startup.
+   If this variable is not specified `${ZENOH_HOME}/zenoh_backend_fs` will be used
+   (where the default value of `${ZENOH_HOME}` is `~/.zenoh`).
+- `<dir>` is the `"dir"` property specified at storage creation.
+ch zenoh **key/value** put into the storage will map to a file within the storage's directory where:
+- the file path will be `${ZENOH_BACKEND_FS_ROOT}/<dir>/<relative_zenoh_key>`, where `<relative_zenoh_key>`
+  will be the zenoh key, stripped from the `"strip_prefix"` property specified at storage creation.
+- the content of the file will be the value written as a RawValue. I.e. the same bytes buffer that has been
+  transported by zenoh. For UTF-8 compatible formats (StringUTF8, JSon, Integer, Float...) it means the file
+  will be readable as a text format.
+- the encoding and the timestamp of the key/value will be stored in a RocksDB database stored in the storage directory.
 
 ### Behaviour on deletion
 
@@ -169,6 +182,7 @@ database for a file (e.g. for files created without zenoh), the encoding is dedu
 modification time.
 
 -------------------------------
+
 ## How to install it
 
 To install the latest release of this backend library, you can do as follows:
@@ -176,11 +190,12 @@ To install the latest release of this backend library, you can do as follows:
 ### Manual installation (all platforms)
 
 All release packages can be downloaded from:  
- - https://download.eclipse.org/zenoh/zenoh-backend-filesystem/latest/   
 
-Each subdirectory has the name of the Rust target. See the platforms each target corresponds to on https://doc.rust-lang.org/stable/rustc/platform-support.html
+- [https://download.eclipse.org/zenoh/zenoh-backend-filesystem/latest/](https://download.eclipse.org/zenoh/zenoh-backend-filesystem/latest/)
 
-Choose your platform and download the `.zip` file.  
+Each subdirectory has the name of the Rust target. See the platforms each target corresponds to on [https://doc.rust-lang.org/stable/rustc/platform-support.html](https://doc.rust-lang.org/stable/rustc/platform-support.html)
+
+Choose your platform and download the `.zip` file.
 Unzip it in the same directory than `zenohd` or to any directory where it can find the backend library (e.g. /usr/lib or ~/.zenoh/lib)
 
 ### Linux Debian
@@ -194,14 +209,15 @@ sudo apt install zenoh-backend-filesystem
 ```
 
 -------------------------------
+
 ## How to build it
 
-> :warning: **WARNING** :warning: : Zenoh and its ecosystem are under active development. When you build from git, make sure you also build from git any other Zenoh repository you plan to use (e.g. binding, plugin, backend, etc.). It may happen that some changes in git are not compatible with the most recent packaged Zenoh release (e.g. deb, docker, pip). We put particular effort in mantaining compatibility between the various git repositories in the Zenoh project. 
+> :warning: **WARNING** :warning: : Zenoh and its ecosystem are under active development. When you build from git, make sure you also build from git any other Zenoh repository you plan to use (e.g. binding, plugin, backend, etc.). It may happen that some changes in git are not compatible with the most recent packaged Zenoh release (e.g. deb, docker, pip). We put particular effort in mantaining compatibility between the various git repositories in the Zenoh project.
 
 At first, install [Clang](https://clang.llvm.org/) and [Cargo and Rust](https://doc.rust-lang.org/cargo/getting-started/installation.html). If you already have the Rust toolchain installed, make sure it is up-to-date with:
 
 ```bash
-$ rustup update
+rustup update
 ```
 
 > :warning: **WARNING** :warning: : As Rust doesn't have a stable ABI, the backend library should be
@@ -210,23 +226,27 @@ Otherwise, incompatibilities in memory mapping of shared types between `zenohd` 
 
 To know the Rust version you're `zenohd` has been built with, use the `--version` option.  
 Example:
+
 ```bash
 $ zenohd --version
 The zenoh router v0.6.0-beta.1 built with rustc 1.64.0 (a55dd71d5 2022-09-19)
 ```
+
 Here, `zenohd` has been built with the rustc version `1.64.0`.  
 Install and use this toolchain with the following command:
 
 ```bash
-$ rustup default 1.64.0
+rustup default 1.64.0
 ```
 
 And `zenohd` version corresponds to an un-released commit with id `1f20c86`. Update the `zenoh` dependency in Cargo.lock with this command:
+
 ```bash
-$ cargo update -p zenoh --precise 1f20c86
+cargo update -p zenoh --precise 1f20c86
 ```
 
 Then build the backend with:
+
 ```bash
-$ cargo build --release --all-targets
+cargo build --release --all-targets
 ```
