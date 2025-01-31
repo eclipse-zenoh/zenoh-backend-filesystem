@@ -68,6 +68,7 @@ jobs:
       repo: ${{ github.repository }}
       version: ${{ needs.tag.outputs.version }}
       branch: ${{ needs.tag.outputs.branch }}
+      exclude-builds: '[{ build: { target: "x86_64-pc-windows-gnu", os: "windows-2019" } }]'
       artifact-patterns: |
         ^libzenoh_backend_fs\.(dylib|so)$
         ^zenoh_backend_fs\.dll$
