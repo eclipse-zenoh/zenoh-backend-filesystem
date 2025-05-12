@@ -24,13 +24,31 @@ on:
     - cron: "0 6 * * 1-5"
 
 jobs:
+  determine-runner:
+    runs-on: ubuntu-latest
+    outputs:
+      runner: ${{ steps.set-runner.outputs.runner }}
+    steps:
+      - name: Clone this repository
+        uses: actions/checkout@v4
+
+      - name: Determine which runner to use
+        id: set-runner
+        run: |
+          if [[ -f ci/runners.json ]]; then
+            echo "runner=$(cat ci/runners.json)" >> $GITHUB_OUTPUT
+          else
+            echo "runner=['ubuntu-latest', 'windows-latest', 'macos-latest']" >> $GITHUB_OUTPUT
+          fi
+
   build:
+    needs: determine-runner
     name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macOS-latest, windows-latest]
+        os: ${{ fromJSON(needs.determine-runner.outputs.runner) }}
 
     steps:
       - uses: actions/checkout@v4
@@ -61,7 +79,8 @@ jobs:
         run: cargo test --verbose
 
   markdown_lint:
-    runs-on: ubuntu-latest
+    needs: determine-runner
+    runs-on: ${{ fromJSON(needs.determine-runner.outputs.runner) }}
     steps:
       - uses: actions/checkout@v4
       - uses: DavidAnson/markdownlint-cli2-action@v18
@@ -70,8 +89,9 @@ jobs:
           globs: '**/README.md'
 
   check_rust:
+      needs: determine-runner
       name: Check ${{ github.repository }} using Rust 1.75
-      runs-on: ubuntu-latest
+      runs-on: ${{ fromJSON(needs.determine-runner.outputs.runner) }}
       strategy:
         fail-fast: false
       steps:
