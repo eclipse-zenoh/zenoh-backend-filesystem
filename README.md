@@ -84,9 +84,9 @@ You can setup storages either at zenoh router startup via a configuration file, 
 - Run the zenoh router, with write permissions to its admin space and with the REST plugin:  
   `zenohd --adminspace-permissions=rw --rest-http-port=8000`
 - Add the "fs" backend (the "zenoh_backend_fs" library will be loaded):  
-  `curl -X PUT -H 'content-type:application/json' -d '{}' http://localhost:8000/@/router/local/config/plugins/storage_manager/volumes/fs`
+  `curl -X PUT -H 'content-type:application/json' -d '{}' http://localhost:8000/@/local/router/config/plugins/storage_manager/volumes/fs`
 - Add the "demo" storage using the "fs" backend:  
-  `curl -X PUT -H 'content-type:application/json' -d '{key_expr:"demo/example/**",strip_prefix:"demo/example", volume: {id: "fs", dir:"example"}}' http://localhost:8000/@/router/local/config/plugins/storage_manager/storages/demo`
+  `curl -X PUT -H 'content-type:application/json' -d '{key_expr:"demo/example/**",strip_prefix:"demo/example", volume: {id: "fs", dir:"example"}}' http://localhost:8000/@/local/router/config/plugins/storage_manager/storages/demo`
 
 ### **Tests using the REST API**
 
