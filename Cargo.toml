@@ -13,7 +13,7 @@
 #
 [package]
 name = "zenoh-backend-filesystem"
-version = "1.4.0"
+version = "1.5.0"
 repository = "https://github.com/eclipse-zenoh/zenoh-backend-filesystem"
 homepage = "http://zenoh.io"
 authors = [
@@ -56,10 +56,10 @@ zenoh = { features = [
     "unstable",
     "internal",
     "plugins"
-] , version = "1.4.0", git = "https://github.com/eclipse-zenoh/zenoh.git" , branch = "main" }
-zenoh_backend_traits = { version = "1.4.0", git = "https://github.com/eclipse-zenoh/zenoh.git" , branch = "main" }
-zenoh-plugin-trait = { version = "1.4.0", git = "https://github.com/eclipse-zenoh/zenoh.git" , branch = "main" }
-zenoh-ext = { version = "1.4.0", git = "https://github.com/eclipse-zenoh/zenoh.git" , branch = "main" }
+] , version = "1.5.0", git = "https://github.com/eclipse-zenoh/zenoh.git" , branch = "main" }
+zenoh_backend_traits = { version = "1.5.0", git = "https://github.com/eclipse-zenoh/zenoh.git" , branch = "main" }
+zenoh-plugin-trait = { version = "1.5.0", git = "https://github.com/eclipse-zenoh/zenoh.git" , branch = "main" }
+zenoh-ext = { version = "1.5.0", git = "https://github.com/eclipse-zenoh/zenoh.git" , branch = "main" }
 
 [build-dependencies]
 rustc_version = "0.4.0"
@@ -70,4 +70,4 @@ maintainer = "zenoh-dev@eclipse.org"
 copyright = "2022 ZettaScale Technology"
 section = "net"
 license-file = ["LICENSE", "0"]
-depends = "zenoh-plugin-storage-manager (=1.4.0)"
+depends = "zenoh-plugin-storage-manager (=1.5.0)"
