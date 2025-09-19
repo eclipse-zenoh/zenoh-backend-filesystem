@@ -35,6 +35,7 @@ use zenoh_plugin_trait::{plugin_long_version, plugin_version, Plugin};
 mod data_info_mgt;
 mod files_mgt;
 use files_mgt::*;
+use zenoh_util::ffi::JsonValue;
 
 const WORKER_THREAD_NUM: usize = 2;
 const MAX_BLOCK_THREAD_NUM: usize = 50;
@@ -158,8 +159,8 @@ fn extract_bool(
 
 #[async_trait]
 impl Volume for FileSystemVolume {
-    fn get_admin_status(&self) -> serde_json::Value {
-        self.admin_status.clone()
+    fn get_admin_status(&self) -> JsonValue {
+        (&self.admin_status).into()
     }
 
     fn get_capability(&self) -> Capability {
@@ -170,7 +171,8 @@ impl Volume for FileSystemVolume {
     }
 
     async fn create_storage(&self, mut config: StorageConfig) -> ZResult<Box<dyn Storage>> {
-        let volume_cfg = match config.volume_cfg.as_object() {
+        let mut cfg = config.volume_cfg.into_serde_value();
+        let volume_cfg = match cfg.as_object_mut() {
             Some(v) => v,
             None => bail!("fs backed volumes require volume-specific configuration"),
         };
@@ -178,7 +180,7 @@ impl Volume for FileSystemVolume {
         let read_only = extract_bool(volume_cfg, PROP_STORAGE_READ_ONLY, false)?;
         let follow_links = extract_bool(volume_cfg, PROP_STORAGE_FOLLOW_LINK, false)?;
         let keep_mime = extract_bool(volume_cfg, PROP_STORAGE_KEEP_MIME, true)?;
-        let on_closure = match config.volume_cfg.get(PROP_STORAGE_ON_CLOSURE) {
+        let on_closure = match volume_cfg.get(PROP_STORAGE_ON_CLOSURE) {
             Some(serde_json::Value::String(s)) if s == "delete_all" => OnClosure::DeleteAll,
             Some(serde_json::Value::String(s)) if s == "do_nothing" => OnClosure::DoNothing,
             None => OnClosure::DoNothing,
@@ -191,7 +193,7 @@ impl Volume for FileSystemVolume {
         };
 
         let base_dir =
-            if let Some(serde_json::Value::String(dir)) = config.volume_cfg.get(PROP_STORAGE_DIR) {
+            if let Some(serde_json::Value::String(dir)) = volume_cfg.get(PROP_STORAGE_DIR) {
                 let dir_path = PathBuf::from(dir.as_str());
                 if dir_path.is_absolute() {
                     bail!(
@@ -258,11 +260,8 @@ impl Volume for FileSystemVolume {
                 })?;
         }
 
-        config
-            .volume_cfg
-            .as_object_mut()
-            .unwrap()
-            .insert("dir_full_path".into(), base_dir.to_string_lossy().into());
+        volume_cfg.insert("dir_full_path".into(), base_dir.to_string_lossy().into());
+        config.volume_cfg = cfg.into();
 
         tracing::debug!(
             "Storage on {} will store files in {}",
@@ -287,8 +286,8 @@ struct FileSystemStorage {
 
 #[async_trait]
 impl Storage for FileSystemStorage {
-    fn get_admin_status(&self) -> serde_json::Value {
-        self.config.to_json_value()
+    fn get_admin_status(&self) -> JsonValue {
+        self.config.to_json_value().into()
     }
 
     async fn put(
