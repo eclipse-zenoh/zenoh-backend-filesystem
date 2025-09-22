@@ -38,7 +38,7 @@ dynamic_plugin = []
 default = ["dynamic_plugin"]
 
 [dependencies]
-async-trait = "0.1.66"
+async-trait = "0.1.89"
 dunce = "1.0.3"
 git-version = "0.3.5"
 home = "0.5.4"
@@ -61,6 +61,7 @@ zenoh_backend_traits = { version = "1.5.1", git = "https://github.com/eclipse-ze
 zenoh-plugin-trait = { version = "1.5.1", git = "https://github.com/eclipse-zenoh/zenoh.git" , branch = "main" }
 zenoh-ext = { version = "1.5.1", git = "https://github.com/eclipse-zenoh/zenoh.git" , branch = "main" }
 zenoh-pinned-deps-1-75 = { version = "1.5.1", git = "https://github.com/eclipse-zenoh/zenoh.git" , branch = "main" }
+zenoh-util = { version = "1.5.1", git = "https://github.com/eclipse-zenoh/zenoh.git" , branch = "main" }
 
 [build-dependencies]
 rustc_version = "0.4.0"
