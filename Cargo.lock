@@ -4295,6 +4295,7 @@ dependencies = [
  "git-version",
  "home",
  "lazy_static",
+ "librocksdb-sys",
  "mime_guess",
  "regex",
  "rocksdb",
