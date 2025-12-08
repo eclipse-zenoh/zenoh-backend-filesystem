@@ -57,12 +57,12 @@ zenoh = { features = [
     "unstable",
     "internal",
     "plugins",
-], version = "1.7.0"}
-zenoh_backend_traits = { version = "1.7.0"}
-zenoh-plugin-trait = { version = "1.7.0"}
-zenoh-ext = { version = "1.7.0"}
-zenoh-pinned-deps-1-75 = { version = "1.7.0"}
-zenoh-util = { version = "1.7.0"}
+], version = "1.7.0", git = "https://github.com/eclipse-zenoh/zenoh.git" , branch = "main" }
+zenoh_backend_traits = { version = "1.7.0", git = "https://github.com/eclipse-zenoh/zenoh.git" , branch = "main" }
+zenoh-plugin-trait = { version = "1.7.0", git = "https://github.com/eclipse-zenoh/zenoh.git" , branch = "main" }
+zenoh-ext = { version = "1.7.0", git = "https://github.com/eclipse-zenoh/zenoh.git" , branch = "main" }
+zenoh-pinned-deps-1-75 = { version = "1.7.0", git = "https://github.com/eclipse-zenoh/zenoh.git" , branch = "main" }
+zenoh-util = { version = "1.7.0", git = "https://github.com/eclipse-zenoh/zenoh.git" , branch = "main" }
 
 [build-dependencies]
 rustc_version = "0.4.0"
