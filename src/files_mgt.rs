@@ -227,6 +227,28 @@ impl FilesMgr {
         }
     }
 
+    // Like read_file, but skips reading the file's payload — returning only the timestamp.
+    // Used by get_all_entries at startup to avoid loading the entire store into memory.
+    pub(crate) async fn read_timestamp(&self, zfile: &ZFile<'_>) -> ZResult<Option<Timestamp>> {
+        let file = &zfile.fspath;
+        match self.perform_read_timestamp(file).await? {
+            Some(x) => Ok(Some(x)),
+            None => {
+                let file = self.get_conflict_file(file.to_path_buf());
+                self.perform_read_timestamp(&file).await
+            }
+        }
+    }
+
+    async fn perform_read_timestamp(&self, file: &Path) -> ZResult<Option<Timestamp>> {
+        if file.exists() && file.is_file() && (self.follow_links || !self.contains_symlink(file)) {
+            let (_, timestamp) = self.get_encoding_and_timestamp(file).await?;
+            Ok(Some(timestamp))
+        } else {
+            Ok(None)
+        }
+    }
+
     async fn perform_read_from_conflict(
         &self,
         file: PathBuf,
