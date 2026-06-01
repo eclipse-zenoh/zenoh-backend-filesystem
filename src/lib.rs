@@ -393,9 +393,9 @@ impl Storage for FileSystemStorage {
         // Add the root entry if it exists.
         // Root key can't be acuired from `matching_files` call
         // because it's name is specially chosen to be not allowed as key value ("@root")
-        if let Some((_, _, timestamp)) = self
+        if let Some(timestamp) = self
             .files_mgr
-            .read_file(&self.files_mgr.to_zfile(ROOT_KEY))
+            .read_timestamp(&self.files_mgr.to_zfile(ROOT_KEY))
             .await?
         {
             result.push((None, timestamp));
@@ -410,8 +410,8 @@ impl Storage for FileSystemStorage {
         {
             let trimmed_zpath = get_trimmed_keyexpr(zfile.zpath.as_ref());
             let trimmed_zfile = self.files_mgr.to_zfile(trimmed_zpath);
-            match self.files_mgr.read_file(&trimmed_zfile).await {
-                Ok(Some((_, _, timestamp))) => {
+            match self.files_mgr.read_timestamp(&trimmed_zfile).await {
+                Ok(Some(timestamp)) => {
                     let zpath = Some(zfile.zpath.as_ref().try_into().unwrap());
                     result.push((zpath, timestamp));
                 }
